@@ -1,6 +1,6 @@
 from math import isclose, log
 
-from app.analytics.iv_surface import fit_iv_curve
+from app.analytics.iv_surface import compute_residual_persistence, fit_iv_curve, roll_residual_history
 
 
 def _quote(contract_id: str, strike: float, right: str, iv: float, liquid: bool = True):
@@ -41,3 +41,32 @@ def test_fit_iv_curve_quadratic_residuals_are_stable():
         residual = result.residual_by_contract[rid]
         assert residual is not None
         assert isclose(residual, 0.0, abs_tol=1e-9)
+
+
+def test_residual_persistence_requires_full_window_threshold_crossing():
+    history = {"c1": [-0.015, -0.014, -0.013, -0.012]}
+    early = compute_residual_persistence(
+        history,
+        persistence_updates=5,
+        persistence_fraction=0.7,
+        iv_imbalance_threshold=-0.01,
+    )
+    assert early["c1"].is_imbalanced is False
+    assert isclose(early["c1"].score, 1.0)
+
+    rolled = roll_residual_history(
+        {"c1": -0.011, "c2": -0.02},
+        history,
+        persistence_updates=5,
+    )
+    result = compute_residual_persistence(
+        rolled,
+        persistence_updates=5,
+        persistence_fraction=0.7,
+        iv_imbalance_threshold=-0.01,
+    )
+
+    assert result["c1"].window_count == 5
+    assert result["c1"].is_imbalanced is True
+    assert isclose(result["c1"].score, 1.0)
+    assert result["c2"].is_imbalanced is False

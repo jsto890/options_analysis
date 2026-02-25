@@ -16,6 +16,32 @@ def test_msi_returns_top_three_strikes_by_score():
     assert result[1].strike == 432.0
 
 
+def test_msi_top_strike_stable_under_small_perturbations():
+    base = {
+        428.0: StrikeExposure(oi=ExposureTriple(dex=0.0, gex=2000.0, vex=0.0), vol=ExposureTriple(None, None, None)),
+        430.0: StrikeExposure(oi=ExposureTriple(dex=0.0, gex=8000.0, vex=0.0), vol=ExposureTriple(None, None, None)),
+        432.0: StrikeExposure(oi=ExposureTriple(dex=0.0, gex=6000.0, vex=0.0), vol=ExposureTriple(None, None, None)),
+        434.0: StrikeExposure(oi=ExposureTriple(dex=0.0, gex=1000.0, vex=0.0), vol=ExposureTriple(None, None, None)),
+    }
+    perturbed = {
+        k: StrikeExposure(
+            oi=ExposureTriple(
+                dex=0.0,
+                gex=(v.oi.gex or 0.0) * (1.0 + (0.01 if k == 432.0 else -0.01)),
+                vex=0.0,
+            ),
+            vol=ExposureTriple(None, None, None),
+        )
+        for k, v in base.items()
+    }
+
+    baseline = compute_msi(base, spot=430.0, msi_bandwidth_pct=0.01)
+    noisy = compute_msi(perturbed, spot=430.0, msi_bandwidth_pct=0.01)
+    assert baseline[0].strike == 430.0
+    assert noisy[0].strike == 430.0
+    assert {item.strike for item in baseline} == {item.strike for item in noisy}
+
+
 def test_mtc_never_selects_illiquid_or_out_of_band_delta_contracts():
     quotes = [
         {
@@ -83,3 +109,6 @@ def test_mtc_never_selects_illiquid_or_out_of_band_delta_contracts():
     assert selected.best_put.contract_id == "good-put"
     assert selected.best_call.tradable_score > 0.0
     assert selected.best_put.tradable_score > 0.0
+    assert selected.best_call.rationale.gate_liquid is True
+    assert selected.best_call.rationale.gate_delta_band is True
+    assert selected.best_put.rationale.delta_abs == 0.5
