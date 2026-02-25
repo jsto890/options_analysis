@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react"
 
+import { MtcRationaleCard } from "@/components/MtcRationaleCard"
 import { StrikeLadder } from "@/components/StrikeLadder"
 import { useStreamStore } from "@/state/store"
 import { formatCompactSigned, formatOptionMid, formatSummaryPercent } from "@/utils/format"
 import { StreamClient } from "@/ws/client"
 import { PlaybackClient } from "@/ws/playback"
-import type { AnyEnvelope } from "@/ws/types"
+import type { AnyEnvelope, ContractBlock, StrikeRow } from "@/ws/types"
 
 export default function App(): JSX.Element {
   const [state, dispatch] = useStreamStore()
@@ -59,6 +60,14 @@ export default function App(): JSX.Element {
     () => Object.values(state.rowsByStrike).sort((a, b) => a.strike - b.strike),
     [state.rowsByStrike]
   )
+  const mtcCallBlock = useMemo(
+    () => findContractById(rows, state.summary.mtc_call_contract_id),
+    [rows, state.summary.mtc_call_contract_id]
+  )
+  const mtcPutBlock = useMemo(
+    () => findContractById(rows, state.summary.mtc_put_contract_id),
+    [rows, state.summary.mtc_put_contract_id]
+  )
 
   return (
     <main className="app-shell">
@@ -91,8 +100,33 @@ export default function App(): JSX.Element {
           <p>MSI: {state.summary.msi_strikes.join(", ") || "N A"}</p>
           <p>Net GEX: {formatCompactSigned(state.summary.net_gex_band)}</p>
           <p>Nearest MSI: {formatSummaryPercent(state.summary.nearest_msi_distance_pct)}</p>
+          <MtcRationaleCard
+            side="Call"
+            contractId={state.summary.mtc_call_contract_id}
+            rationale={mtcCallBlock?.mtc_rationale ?? null}
+          />
+          <MtcRationaleCard
+            side="Put"
+            contractId={state.summary.mtc_put_contract_id}
+            rationale={mtcPutBlock?.mtc_rationale ?? null}
+          />
         </div>
       </section>
     </main>
   )
+}
+
+function findContractById(rows: StrikeRow[], contractId: string | null): ContractBlock | null {
+  if (!contractId) {
+    return null
+  }
+  for (const row of rows) {
+    if (row.call.contract_id === contractId) {
+      return row.call
+    }
+    if (row.put.contract_id === contractId) {
+      return row.put
+    }
+  }
+  return null
 }

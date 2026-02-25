@@ -122,6 +122,49 @@ body {
   color: #fff;
 }
 
+.rationale-card {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #d8e1ec;
+}
+
+.rationale-card h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+.rationale-contract {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: #1d3557;
+}
+
+.rationale-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  margin: 0;
+}
+
+.rationale-grid dt {
+  margin: 0;
+  font-size: 11px;
+  color: #415a77;
+}
+
+.rationale-grid dd {
+  margin: 0;
+  text-align: right;
+  font-size: 11px;
+  color: #0d1b2a;
+}
+
+.rationale-empty {
+  margin: 0;
+  font-size: 11px;
+  color: #6c7d90;
+}
+
 .w-mid {
   width: 74px;
 }
