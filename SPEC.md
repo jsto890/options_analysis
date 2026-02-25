@@ -373,11 +373,12 @@ MTC highlight:
 ### 8.3 Environment variables
 Backend:
 1. IBKR_HOST default "127.0.0.1"
-2. IBKR_PORT default 7497
-3. IBKR_CLIENT_ID default 7
-4. BACKEND_HOST default "127.0.0.1"
-5. BACKEND_PORT default 8000
-6. LOG_LEVEL default "INFO"
+2. IBKR_PAPER_PORT default 7497
+3. IBKR_LIVE_PORT default 7496
+4. IBKR_CLIENT_ID default 19
+5. BACKEND_HOST default "127.0.0.1"
+6. BACKEND_PORT default 8000
+7. LOG_LEVEL default "INFO"
 
 ## 9. Backend implementation details
 ### 9.1 Modules and responsibilities

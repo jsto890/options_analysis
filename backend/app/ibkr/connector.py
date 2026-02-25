@@ -25,7 +25,6 @@ class IBKRConnector:
         self.ib = IB()
         self.connected = False
         self.current_market_data_type: Optional[int] = None
-        self.account_info: dict[str, float | int | str] = {}
         if self.config.read_only:
             self._enforce_read_only()
 
@@ -40,7 +39,6 @@ class IBKRConnector:
             )
             self.connected = True
             self.set_market_data_type(self.config.market_data_type)
-            await self._load_account_info()
             logger.info("Connected to IBKR at %s:%s", self.config.host, port)
             return True
         except Exception as exc:
@@ -176,37 +174,6 @@ class IBKRConnector:
             return tickers[0] if tickers else None
 
         return self.ib.reqMktData(contract, "", False, regulatory)
-
-    async def _load_account_info(self) -> None:
-        if not self.is_connected():
-            return
-        try:
-            rows = await self.ib.accountSummaryAsync()
-            if not rows:
-                return
-            account_id = self.config.account or rows[0].account
-            filtered = [r for r in rows if r.account == account_id] or rows
-
-            def value(tag: str, default: float = 0.0) -> float:
-                tag_rows = [r for r in filtered if str(r.tag) == tag]
-                if not tag_rows:
-                    return default
-                usd = [r for r in tag_rows if getattr(r, "currency", "USD") == "USD"]
-                chosen = usd[0] if usd else tag_rows[0]
-                try:
-                    return float(chosen.value)
-                except Exception:
-                    return default
-
-            self.account_info = {
-                "account": account_id,
-                "net_liquidation": value("NetLiquidation"),
-                "total_cash": value("TotalCashValue"),
-                "buying_power": value("BuyingPower"),
-                "available_funds": value("AvailableFunds"),
-            }
-        except Exception as exc:
-            logger.error("Failed to load account summary: %s", exc)
 
     def _enforce_read_only(self) -> None:
         def _blocked(*_args, **_kwargs):
