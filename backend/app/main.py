@@ -10,11 +10,20 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from app.analytics.engine import AnalyticsOutput, run_analytics
 from app.config_store import ConfigStore
 from app.ibkr.config import IBKRConfig
 from app.ibkr.connector import IBKRConnector
 from app.ibkr.window_manager import StrikeWindowManager
-from app.schemas import ConfigUpdate, HealthResponse, HeartbeatPayload, StateSnapshot, build_default_snapshot
+from app.schemas import (
+    ConfigUpdate,
+    ContractBlock,
+    HealthResponse,
+    HeartbeatPayload,
+    MtcRationale,
+    StateSnapshot,
+    build_default_snapshot,
+)
 from app.state.store import RuntimeStore
 
 logger = logging.getLogger(__name__)
@@ -94,6 +103,7 @@ def create_app(
     app.state.heartbeat_task: asyncio.Task | None = None
     app.state.refresh_task: asyncio.Task | None = None
     app.state.connect_task: asyncio.Task | None = None
+    app.state.residual_history: dict[str, list[float | None]] = {}
 
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
@@ -165,7 +175,19 @@ async def _refresh_loop(app: FastAPI) -> None:
 
         await asyncio.sleep(interval)
 
-        # Keep summary fields coherent while the full analytics pipeline is integrated.
+        snapshot = app.state.store.snapshot
+        spot = snapshot.underlying.spot.mid
+        if snapshot.rows and spot is not None and spot > 0:
+            analytics = run_analytics(
+                _build_contract_quotes(snapshot),
+                spot=spot,
+                config=snapshot.config.model_dump(),
+                residual_history_by_contract=app.state.residual_history,
+            )
+            app.state.residual_history = analytics.residual_history_by_contract
+            _apply_analytics(snapshot, analytics, spot)
+
+        # Keep fallback summary values coherent when analytics data is sparse.
         app.state.store.derive_summary_defaults()
         delta = app.state.store.compute_delta()
         if delta is None:
@@ -200,6 +222,109 @@ async def _heartbeat_loop(app: FastAPI) -> None:
             "payload": payload.model_dump(),
         }
         await _broadcast(app, msg)
+
+
+def _build_contract_quotes(snapshot: StateSnapshot) -> list[dict[str, Any]]:
+    quotes: list[dict[str, Any]] = []
+    for row in snapshot.rows:
+        for right, block in (("C", row.call), ("P", row.put)):
+            quotes.append(
+                {
+                    "contract_id": block.contract_id,
+                    "right": right,
+                    "strike": row.strike,
+                    "model_iv": block.iv,
+                    "liquid": block.liquid,
+                    "model_delta": block.delta,
+                    "model_gamma": block.gamma,
+                    "model_vega": block.vega,
+                    "open_interest": block.oi,
+                    "volume": block.volume,
+                    "spread_pct": block.spread_pct,
+                    "stale_ms": block.stale_ms,
+                    "delta": block.delta,
+                    "gamma_per_dollar": block.per_dollar.gamma_per_dollar,
+                    "vega_per_dollar": block.per_dollar.vega_per_dollar,
+                    "theta_per_dollar": block.per_dollar.theta_per_dollar,
+                }
+            )
+    return quotes
+
+
+def _apply_analytics(snapshot: StateSnapshot, analytics: AnalyticsOutput, spot: float) -> None:
+    msi_by_strike = {item.strike: item for item in analytics.msi}
+    msi_strikes = [item.strike for item in analytics.msi]
+
+    snapshot.summary.msi_strikes = msi_strikes
+    snapshot.summary.mtc_call_contract_id = (
+        analytics.mtc.best_call.contract_id if analytics.mtc.best_call is not None else None
+    )
+    snapshot.summary.mtc_put_contract_id = (
+        analytics.mtc.best_put.contract_id if analytics.mtc.best_put is not None else None
+    )
+    snapshot.summary.nearest_msi_distance_pct = (
+        min(abs(strike - spot) / spot for strike in msi_strikes) if msi_strikes and spot > 0 else None
+    )
+
+    if spot > 0:
+        net_gex_band = 0.0
+        band = snapshot.config.gex_band_pct
+        for strike, exposure in analytics.exposures_by_strike.items():
+            if abs(strike - spot) / spot <= band:
+                net_gex_band += float(exposure.oi.gex or 0.0)
+        snapshot.summary.net_gex_band = net_gex_band
+    else:
+        snapshot.summary.net_gex_band = None
+
+    for row in snapshot.rows:
+        msi = msi_by_strike.get(row.strike)
+        row.msi_score = msi.msi_score if msi else None
+        row.flags.is_msi = msi is not None
+        row.flags.wall_type = msi.wall_type if msi else "none"
+
+        exposure = analytics.exposures_by_strike.get(row.strike)
+        if exposure:
+            row.exposures.oi.dex = exposure.oi.dex
+            row.exposures.oi.gex = exposure.oi.gex
+            row.exposures.oi.vex = exposure.oi.vex
+            row.exposures.vol.dex = exposure.vol.dex
+            row.exposures.vol.gex = exposure.vol.gex
+            row.exposures.vol.vex = exposure.vol.vex
+
+        _apply_contract_analytics(row.call, analytics, analytics.mtc.best_call)
+        _apply_contract_analytics(row.put, analytics, analytics.mtc.best_put)
+
+
+def _apply_contract_analytics(
+    block: ContractBlock,
+    analytics: AnalyticsOutput,
+    mtc_selection: Any,
+) -> None:
+    block.iv_residual = analytics.iv_fit.residual_by_contract.get(block.contract_id)
+
+    if mtc_selection is None or block.contract_id != mtc_selection.contract_id:
+        block.mtc_score = None
+        block.mtc_rationale = None
+        return
+
+    rationale = mtc_selection.rationale
+    notes: list[str] = []
+    if not rationale.gate_liquid:
+        notes.append("liquidity-gate-failed")
+    if not rationale.gate_delta_band:
+        notes.append("delta-gate-failed")
+
+    block.mtc_score = mtc_selection.tradable_score
+    block.mtc_rationale = MtcRationale(
+        liquidity_score=rationale.liquidity_score,
+        cheap_iv_score=rationale.cheap_iv_score,
+        efficiency_score=rationale.efficiency_score,
+        stability_score=rationale.stability_score,
+        tradable_score=mtc_selection.tradable_score,
+        gate_liquid=rationale.gate_liquid,
+        gate_delta_band=rationale.gate_delta_band,
+        notes=notes,
+    )
 
 
 def _subscription_count(app: FastAPI) -> int:
