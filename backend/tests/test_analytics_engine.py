@@ -52,9 +52,14 @@ def test_engine_runs_deterministically_and_returns_shapes():
             "max_spread_pct": 0.12,
             "max_stale_ms": 1500,
             "iv_residual_scale": 0.015,
+            "persistence_updates": 2,
+            "persistence_fraction": 0.5,
+            "iv_imbalance_threshold": -0.01,
         },
     )
 
     assert isinstance(output.exposures_by_strike, dict)
     assert output.mtc.best_call is not None
     assert output.mtc.best_put is not None
+    assert output.residual_history_by_contract
+    assert output.residual_persistence_by_contract
