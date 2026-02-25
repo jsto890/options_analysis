@@ -37,3 +37,8 @@ def test_connector_read_only_blocks_order_calls():
     connector = IBKRConnector(IBKRConfig(read_only=True))
     with pytest.raises(ReadOnlyViolation):
         connector.ib.placeOrder(None, None)
+
+
+def test_connector_does_not_expose_account_summary_cache():
+    connector = IBKRConnector(IBKRConfig(read_only=True))
+    assert not hasattr(connector, "account_info")

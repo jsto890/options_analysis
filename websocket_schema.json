@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QQQ 0DTE WebSocket Envelope",
+  "type": "object",
+  "oneOf": [
+    {
+      "allOf": [
+        { "$ref": "#/$defs/envelopeBase" },
+        {
+          "type": "object",
+          "required": ["type", "payload"],
+          "properties": {
+            "type": { "const": "snapshot" },
+            "payload": { "$ref": "#/$defs/snapshotPayload" }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        { "$ref": "#/$defs/envelopeBase" },
+        {
+          "type": "object",
+          "required": ["type", "payload"],
+          "properties": {
+            "type": { "const": "delta" },
+            "payload": { "$ref": "#/$defs/deltaPayload" }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        { "$ref": "#/$defs/envelopeBase" },
+        {
+          "type": "object",
+          "required": ["type", "payload"],
+          "properties": {
+            "type": { "const": "heartbeat" },
+            "payload": { "$ref": "#/$defs/heartbeatPayload" }
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "envelopeBase": {
+      "type": "object",
+      "required": ["type", "schema_version", "ts_ms", "payload"],
+      "properties": {
+        "type": { "type": "string", "enum": ["snapshot", "delta", "heartbeat"] },
+        "schema_version": { "const": 1 },
+        "ts_ms": { "type": "integer", "minimum": 0 },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "underlyingSpot": {
+      "type": "object",
+      "required": ["bid", "ask", "last", "mid", "ts_ms"],
+      "properties": {
+        "bid": { "type": ["number", "null"] },
+        "ask": { "type": ["number", "null"] },
+        "last": { "type": ["number", "null"] },
+        "mid": { "type": ["number", "null"] },
+        "ts_ms": { "type": "integer" }
+      }
+    },
+    "perDollarGreeks": {
+      "type": "object",
+      "required": ["gamma_per_dollar", "vega_per_dollar", "theta_per_dollar"],
+      "properties": {
+        "gamma_per_dollar": { "type": ["number", "null"] },
+        "vega_per_dollar": { "type": ["number", "null"] },
+        "theta_per_dollar": { "type": ["number", "null"] }
+      }
+    },
+    "mtcRationale": {
+      "type": "object",
+      "required": [
+        "liquidity_score",
+        "cheap_iv_score",
+        "efficiency_score",
+        "stability_score",
+        "tradable_score",
+        "gate_liquid",
+        "gate_delta_band",
+        "notes"
+      ],
+      "properties": {
+        "liquidity_score": { "type": "number" },
+        "cheap_iv_score": { "type": "number" },
+        "efficiency_score": { "type": "number" },
+        "stability_score": { "type": "number" },
+        "tradable_score": { "type": "number" },
+        "gate_liquid": { "type": "boolean" },
+        "gate_delta_band": { "type": "boolean" },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "contractBlock": {
+      "type": "object",
+      "required": [
+        "contract_id",
+        "mid",
+        "iv",
+        "iv_residual",
+        "delta",
+        "gamma",
+        "vega",
+        "theta",
+        "spread_pct",
+        "volume",
+        "oi",
+        "liquid",
+        "stale_ms",
+        "per_dollar",
+        "mtc_score",
+        "mtc_rationale"
+      ],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "mid": { "type": ["number", "null"] },
+        "iv": { "type": ["number", "null"] },
+        "iv_residual": { "type": ["number", "null"] },
+        "delta": { "type": ["number", "null"] },
+        "gamma": { "type": ["number", "null"] },
+        "vega": { "type": ["number", "null"] },
+        "theta": { "type": ["number", "null"] },
+        "spread_pct": { "type": ["number", "null"] },
+        "volume": { "type": ["integer", "null"] },
+        "oi": { "type": ["integer", "null"] },
+        "liquid": { "type": "boolean" },
+        "stale_ms": { "type": "integer" },
+        "per_dollar": { "$ref": "#/$defs/perDollarGreeks" },
+        "mtc_score": { "type": ["number", "null"] },
+        "mtc_rationale": {
+          "oneOf": [{ "$ref": "#/$defs/mtcRationale" }, { "type": "null" }]
+        }
+      }
+    },
+    "exposureTriple": {
+      "type": "object",
+      "required": ["dex", "gex", "vex"],
+      "properties": {
+        "dex": { "type": ["number", "null"] },
+        "gex": { "type": ["number", "null"] },
+        "vex": { "type": ["number", "null"] }
+      }
+    },
+    "strikeRow": {
+      "type": "object",
+      "required": ["strike", "msi_score", "flags", "call", "put", "exposures"],
+      "properties": {
+        "strike": { "type": "number" },
+        "msi_score": { "type": ["number", "null"] },
+        "flags": {
+          "type": "object",
+          "required": ["is_msi", "wall_type"],
+          "properties": {
+            "is_msi": { "type": "boolean" },
+            "wall_type": { "type": "string", "enum": ["none", "call_wall", "put_wall"] }
+          }
+        },
+        "call": { "$ref": "#/$defs/contractBlock" },
+        "put": { "$ref": "#/$defs/contractBlock" },
+        "exposures": {
+          "type": "object",
+          "required": ["oi", "vol"],
+          "properties": {
+            "oi": { "$ref": "#/$defs/exposureTriple" },
+            "vol": { "$ref": "#/$defs/exposureTriple" }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "net_gex_band",
+        "pin_risk",
+        "msi_strikes",
+        "mtc_call_contract_id",
+        "mtc_put_contract_id",
+        "nearest_msi_distance_pct"
+      ],
+      "properties": {
+        "net_gex_band": { "type": ["number", "null"] },
+        "pin_risk": { "type": "number" },
+        "msi_strikes": { "type": "array", "items": { "type": "number" } },
+        "mtc_call_contract_id": { "type": ["string", "null"] },
+        "mtc_put_contract_id": { "type": ["string", "null"] },
+        "nearest_msi_distance_pct": { "type": ["number", "null"] }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "update_interval_ms",
+        "window_strikes_each_side",
+        "roll_threshold_strikes",
+        "max_spread_pct",
+        "min_bid_size",
+        "min_ask_size",
+        "max_stale_ms",
+        "min_fit_points",
+        "delta_band_min",
+        "delta_band_max",
+        "msi_bandwidth_pct",
+        "gex_band_pct",
+        "persistence_updates",
+        "persistence_fraction",
+        "iv_residual_scale",
+        "iv_imbalance_threshold",
+        "min_mid_for_extremes",
+        "max_subscriptions_soft_limit"
+      ],
+      "properties": {
+        "update_interval_ms": { "type": "integer" },
+        "window_strikes_each_side": { "type": "integer" },
+        "roll_threshold_strikes": { "type": "integer" },
+        "max_spread_pct": { "type": "number" },
+        "min_bid_size": { "type": "integer" },
+        "min_ask_size": { "type": "integer" },
+        "max_stale_ms": { "type": "integer" },
+        "min_fit_points": { "type": "integer" },
+        "delta_band_min": { "type": "number" },
+        "delta_band_max": { "type": "number" },
+        "msi_bandwidth_pct": { "type": "number" },
+        "gex_band_pct": { "type": "number" },
+        "persistence_updates": { "type": "integer" },
+        "persistence_fraction": { "type": "number" },
+        "iv_residual_scale": { "type": "number" },
+        "iv_imbalance_threshold": { "type": "number" },
+        "min_mid_for_extremes": { "type": "number" },
+        "max_subscriptions_soft_limit": { "type": "integer" }
+      }
+    },
+    "snapshotPayload": {
+      "type": "object",
+      "required": ["underlying", "config", "summary", "rows"],
+      "properties": {
+        "underlying": {
+          "type": "object",
+          "required": ["symbol", "expiry", "spot"],
+          "properties": {
+            "symbol": { "type": "string" },
+            "expiry": { "type": "string" },
+            "spot": { "$ref": "#/$defs/underlyingSpot" }
+          }
+        },
+        "config": { "$ref": "#/$defs/config" },
+        "summary": { "$ref": "#/$defs/summary" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/strikeRow" } }
+      }
+    },
+    "deltaPayload": {
+      "type": "object",
+      "required": ["underlying_patch", "summary_patch", "row_patches"],
+      "properties": {
+        "underlying_patch": { "type": "object" },
+        "summary_patch": { "type": "object" },
+        "row_patches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["strike"],
+            "properties": {
+              "strike": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "heartbeatPayload": {
+      "type": "object",
+      "required": ["server_ts_ms", "ibkr_connected", "subscriptions"],
+      "properties": {
+        "server_ts_ms": { "type": "integer" },
+        "ibkr_connected": { "type": "boolean" },
+        "subscriptions": { "type": "integer" }
+      }
+    }
+  }
+}

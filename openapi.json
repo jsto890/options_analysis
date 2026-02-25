@@ -1,6 +1,5 @@
 {
-    "filename": "openapi.json",
-    "openapi": "3.0.3",
+    "openapi": "3.1.0",
     "info": {
       "title": "QQQ 0DTE Ladder Backend",
       "version": "1.0.0"
@@ -124,14 +123,14 @@
         "PerDollarGreeks": {
           "type": "object",
           "required": [
-            "gamma",
-            "vega",
-            "theta"
+            "gamma_per_dollar",
+            "vega_per_dollar",
+            "theta_per_dollar"
           ],
           "properties": {
-            "gamma": { "type": ["number", "null"] },
-            "vega": { "type": ["number", "null"] },
-            "theta": { "type": ["number", "null"] }
+            "gamma_per_dollar": { "type": ["number", "null"] },
+            "vega_per_dollar": { "type": ["number", "null"] },
+            "theta_per_dollar": { "type": ["number", "null"] }
           }
         },
         "MtcRationale": {
