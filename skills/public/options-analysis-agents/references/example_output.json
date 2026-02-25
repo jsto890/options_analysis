@@ -1,0 +1,29 @@
+{
+  "task_id": "demo-001",
+  "as_of": "2026-02-25T21:00:00-05:00",
+  "underlying": "SPY",
+  "spot": 500.0,
+  "strategy": "Bull Call Spread",
+  "legs": [
+    {"side": "long", "type": "call", "strike": 500, "expiry": "2026-03-15", "quantity": 1, "premium": 8.5},
+    {"side": "short", "type": "call", "strike": 510, "expiry": "2026-03-15", "quantity": 1, "premium": 4.1}
+  ],
+  "metrics": {
+    "cost": 4.4,
+    "max_loss": 4.4,
+    "max_profit": 5.6,
+    "breakevens": [504.4],
+    "greeks": {"delta": 0.37, "gamma": 0.06, "theta": -0.02, "vega": 0.11, "rho": null}
+  },
+  "assumptions": [
+    "User-provided spot and IV proxy",
+    "Flat rate and dividend for horizon"
+  ],
+  "scenarios": [
+    {"date": "2026-03-01", "spot": 495, "iv_shift": 0.0, "pnl": -2.8, "notes": "Down move"},
+    {"date": "2026-03-01", "spot": 500, "iv_shift": 0.0, "pnl": -2.4, "notes": "Flat"},
+    {"date": "2026-03-01", "spot": 510, "iv_shift": 0.0, "pnl": 3.2, "notes": "Up move"}
+  ],
+  "confidence": 0.75,
+  "disclaimers": "Educational example only; not investment advice."
+}
