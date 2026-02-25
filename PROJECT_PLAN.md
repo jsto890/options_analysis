@@ -2,6 +2,7 @@
 
 This file is the canonical planning reference for the project.  
 Status: planning only, no implementation started.
+NEVER SET AN ORDER FOR A TRADE, ONLY READ THE DATA AND DISPLAY.
 
 ## 1) Product Intent
 
