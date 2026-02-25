@@ -26,6 +26,14 @@ class IVFitResult:
     residual_by_contract: dict[str, float | None]
 
 
+@dataclass(frozen=True)
+class ResidualPersistence:
+    score: float
+    is_imbalanced: bool
+    qualifying_count: int
+    window_count: int
+
+
 def _solve_3x3(matrix: list[list[float]], vector: list[float]) -> tuple[float, float, float] | None:
     # Gaussian elimination with partial pivoting for a 3x3 system.
     a = [row[:] + [vector[i]] for i, row in enumerate(matrix)]
@@ -131,3 +139,51 @@ def fit_iv_curve(option_quotes: list[IVQuote], spot: float, min_fit_points: int 
             residual_by_contract[contract_id] = iv - fitted
 
     return IVFitResult(coefficients_by_right=coefficients_by_right, residual_by_contract=residual_by_contract)
+
+
+def roll_residual_history(
+    residual_by_contract: dict[str, float | None],
+    residual_history_by_contract: dict[str, list[float | None]] | None,
+    persistence_updates: int,
+) -> dict[str, list[float | None]]:
+    """Returns a trimmed copy of residual history with latest residual values appended."""
+    window = max(1, persistence_updates)
+    next_history: dict[str, list[float | None]] = {}
+
+    if residual_history_by_contract:
+        for contract_id, history in residual_history_by_contract.items():
+            next_history[contract_id] = list(history[-window:])
+
+    for contract_id, residual in residual_by_contract.items():
+        history = next_history.setdefault(contract_id, [])
+        history.append(residual)
+        if len(history) > window:
+            del history[:-window]
+
+    return next_history
+
+
+def compute_residual_persistence(
+    residual_history_by_contract: dict[str, list[float | None]],
+    *,
+    persistence_updates: int,
+    persistence_fraction: float,
+    iv_imbalance_threshold: float,
+) -> dict[str, ResidualPersistence]:
+    """Computes residual persistence score and imbalance flags per contract."""
+    required_window = max(1, persistence_updates)
+    persistence: dict[str, ResidualPersistence] = {}
+
+    for contract_id, history in residual_history_by_contract.items():
+        window = history[-required_window:]
+        qualifying = sum(1 for value in window if value is not None and value <= iv_imbalance_threshold)
+        score = qualifying / len(window) if window else 0.0
+        is_imbalanced = len(window) >= required_window and score >= persistence_fraction
+        persistence[contract_id] = ResidualPersistence(
+            score=score,
+            is_imbalanced=is_imbalanced,
+            qualifying_count=qualifying,
+            window_count=len(window),
+        )
+
+    return persistence

@@ -23,6 +23,20 @@ class MTCQuote(TypedDict, total=False):
 
 
 @dataclass(frozen=True)
+class MTCRationale:
+    gate_liquid: bool
+    gate_delta_band: bool
+    spread_pct: float | None
+    stale_ms: float
+    delta_abs: float | None
+    iv_residual: float | None
+    liquidity_score: float
+    cheap_iv_score: float
+    efficiency_score: float
+    stability_score: float
+
+
+@dataclass(frozen=True)
 class MTCScored:
     contract_id: str
     right: Literal["C", "P"]
@@ -33,6 +47,7 @@ class MTCScored:
     stability_score: float
     gate_liquid: bool
     gate_delta_band: bool
+    rationale: MTCRationale
 
 
 @dataclass(frozen=True)
@@ -168,6 +183,18 @@ def select_mtc(
             stability_score=stability_score,
             gate_liquid=liquid,
             gate_delta_band=gate_delta_band,
+            rationale=MTCRationale(
+                gate_liquid=liquid,
+                gate_delta_band=gate_delta_band,
+                spread_pct=spread_pct,
+                stale_ms=stale_ms,
+                delta_abs=abs(delta) if delta is not None else None,
+                iv_residual=iv_residual,
+                liquidity_score=liquidity_score,
+                cheap_iv_score=cheap_iv_score,
+                efficiency_score=efficiency_score,
+                stability_score=stability_score,
+            ),
         )
 
         if right == "C":
