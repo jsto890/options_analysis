@@ -1,11 +1,33 @@
 import { describe, expect, it } from "vitest"
 
 import { EMPTY_STATE, applyEnvelope } from "@/ws/reducer"
+import type { Config, DeltaEnvelope, SnapshotEnvelope } from "@/ws/types"
 
 
 describe("stream reducer", () => {
   it("applies snapshot and delta patches", () => {
-    const snapshot = {
+    const config: Config = {
+      update_interval_ms: 500,
+      window_strikes_each_side: 20,
+      roll_threshold_strikes: 2,
+      max_spread_pct: 0.12,
+      min_bid_size: 10,
+      min_ask_size: 10,
+      max_stale_ms: 1500,
+      min_fit_points: 8,
+      delta_band_min: 0.3,
+      delta_band_max: 0.65,
+      msi_bandwidth_pct: 0.0075,
+      gex_band_pct: 0.0075,
+      persistence_updates: 10,
+      persistence_fraction: 0.7,
+      iv_residual_scale: 0.015,
+      iv_imbalance_threshold: -0.01,
+      min_mid_for_extremes: 0.05,
+      max_subscriptions_soft_limit: 95
+    }
+
+    const snapshot: SnapshotEnvelope = {
       type: "snapshot" as const,
       schema_version: 1 as const,
       ts_ms: 1,
@@ -15,7 +37,7 @@ describe("stream reducer", () => {
           expiry: "20260225",
           spot: { bid: 430, ask: 430.1, last: 430.05, mid: 430.05, ts_ms: 1 }
         },
-        config: {} as never,
+        config,
         summary: {
           net_gex_band: 100,
           pin_risk: 63,
@@ -85,7 +107,7 @@ describe("stream reducer", () => {
     const stateAfterSnapshot = applyEnvelope(EMPTY_STATE, snapshot)
     expect(stateAfterSnapshot.rowsByStrike[430].call.mid).toBe(1)
 
-    const delta = {
+    const delta: DeltaEnvelope = {
       type: "delta" as const,
       schema_version: 1 as const,
       ts_ms: 2,
