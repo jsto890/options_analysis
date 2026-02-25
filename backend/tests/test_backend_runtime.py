@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config_store import ConfigStore
 from app.main import RuntimeSettings, create_app
+from app.schemas import ContractBlock, PerDollarGreeks, StrikeRow
 
 
 class DummyIB:
@@ -32,7 +33,7 @@ class DummyConnector:
         return self._connected
 
 
-def _make_app(tmp_path, subscriptions: int = 0):
+def _make_app(tmp_path, subscriptions: int = 0, seed_rows: bool = False):
     default_cfg = {
         "update_interval_ms": 500,
         "window_strikes_each_side": 20,
@@ -60,6 +61,51 @@ def _make_app(tmp_path, subscriptions: int = 0):
         config_store=ConfigStore(root_dir=tmp_path),
         connector=DummyConnector(connected=True, subscriptions=subscriptions),
     )
+    if seed_rows:
+        app.state.store.snapshot.underlying.spot.mid = 430.0
+        app.state.store.snapshot.rows = [
+            StrikeRow(
+                strike=430.0,
+                call=ContractBlock(
+                    contract_id="call-430",
+                    mid=1.20,
+                    iv=0.22,
+                    delta=0.45,
+                    gamma=0.01,
+                    vega=0.10,
+                    theta=-0.02,
+                    spread_pct=0.03,
+                    volume=120,
+                    oi=300,
+                    liquid=True,
+                    stale_ms=100,
+                    per_dollar=PerDollarGreeks(
+                        gamma_per_dollar=0.018,
+                        vega_per_dollar=0.090,
+                        theta_per_dollar=0.012,
+                    ),
+                ),
+                put=ContractBlock(
+                    contract_id="put-430",
+                    mid=1.15,
+                    iv=0.24,
+                    delta=-0.48,
+                    gamma=0.011,
+                    vega=0.095,
+                    theta=-0.018,
+                    spread_pct=0.025,
+                    volume=115,
+                    oi=280,
+                    liquid=True,
+                    stale_ms=120,
+                    per_dollar=PerDollarGreeks(
+                        gamma_per_dollar=0.017,
+                        vega_per_dollar=0.085,
+                        theta_per_dollar=0.011,
+                    ),
+                ),
+            )
+        ]
     return app
 
 
@@ -126,3 +172,34 @@ def test_health_reports_subscription_count(tmp_path):
         body = response.json()
         assert body["ok"] is True
         assert body["subscriptions"] == 3
+
+
+def test_refresh_loop_populates_msi_and_mtc_fields(tmp_path):
+    app = _make_app(tmp_path, seed_rows=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/stream") as ws:
+            ws.receive_json()  # snapshot
+
+            analytics_delta = None
+            for _ in range(40):
+                message = ws.receive_json()
+                if message["type"] != "delta":
+                    continue
+                summary_patch = message["payload"]["summary_patch"]
+                if (
+                    summary_patch.get("mtc_call_contract_id") == "call-430"
+                    and summary_patch.get("mtc_put_contract_id") == "put-430"
+                ):
+                    analytics_delta = message
+                    break
+
+            assert analytics_delta is not None
+            summary = analytics_delta["payload"]["summary_patch"]
+            assert summary["msi_strikes"] == [430.0]
+
+            row_patches = analytics_delta["payload"]["row_patches"]
+            assert row_patches
+            row = row_patches[0]
+            assert row["flags"]["is_msi"] is True
+            assert row["call"]["mtc_score"] is not None
+            assert row["put"]["mtc_score"] is not None
