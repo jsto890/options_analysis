@@ -1,5 +1,5 @@
-// filename: types.ts
 export type WallType = "none" | "call_wall" | "put_wall"
+export type EnvelopeType = "snapshot" | "delta" | "heartbeat"
 
 export interface UnderlyingSpot {
   bid: number | null
@@ -124,8 +124,6 @@ export interface HeartbeatPayload {
   ibkr_connected: boolean
   subscriptions: number
 }
-
-export type EnvelopeType = "snapshot" | "delta" | "heartbeat"
 
 export interface Envelope<TPayload> {
   type: EnvelopeType
