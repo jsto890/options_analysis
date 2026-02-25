@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  formatCompactSigned,
   formatCount,
   formatIv,
   formatIvResidualVolPoints,
   formatOptionMid,
   formatSpreadPct,
+  formatSummaryPercent,
   ladderNull,
   summaryNull
 } from "@/utils/format"
@@ -31,5 +33,17 @@ describe("formatting", () => {
     expect(ladderNull(null)).toBe("·")
     expect(summaryNull(null)).toBe("N A")
     expect(formatCount(12345)).toBe("12,345")
+  })
+
+  it("formats compact signed summary values", () => {
+    expect(formatCompactSigned(1_234_567)).toBe("+1.23M")
+    expect(formatCompactSigned(-12_345)).toBe("-12.35K")
+    expect(formatCompactSigned(12.3)).toBe("+12.30")
+    expect(formatCompactSigned(null)).toBe("N A")
+  })
+
+  it("formats summary percentages", () => {
+    expect(formatSummaryPercent(0.0075)).toBe("0.75%")
+    expect(formatSummaryPercent(null)).toBe("N A")
   })
 })

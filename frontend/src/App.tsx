@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { StrikeLadder } from "@/components/StrikeLadder"
 import { useStreamStore } from "@/state/store"
-import { formatOptionMid } from "@/utils/format"
+import { formatCompactSigned, formatOptionMid, formatSummaryPercent } from "@/utils/format"
 import { StreamClient } from "@/ws/client"
 import { PlaybackClient } from "@/ws/playback"
 import type { AnyEnvelope } from "@/ws/types"
@@ -89,7 +89,8 @@ export default function App(): JSX.Element {
           <h3>Summary</h3>
           <p>Pin Risk: {Math.round(state.summary.pin_risk)}</p>
           <p>MSI: {state.summary.msi_strikes.join(", ") || "N A"}</p>
-          <p>Net GEX: {state.summary.net_gex_band ?? "N A"}</p>
+          <p>Net GEX: {formatCompactSigned(state.summary.net_gex_band)}</p>
+          <p>Nearest MSI: {formatSummaryPercent(state.summary.nearest_msi_distance_pct)}</p>
         </div>
       </section>
     </main>
