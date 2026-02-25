@@ -1,0 +1,177 @@
+:root {
+  font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #0d1b2a;
+  background: radial-gradient(circle at top right, #f6f8ff 0%, #e6edf4 40%, #dce5ef 100%);
+}
+
+* {
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 12px;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #c9d4e2;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.status {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.status.ok {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.status.down {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.content-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 210px minmax(760px, 1fr) 260px;
+  gap: 12px;
+}
+
+.left-panel,
+.right-panel {
+  border: 1px solid #c9d4e2;
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.center-panel {
+  border: 1px solid #c9d4e2;
+  border-radius: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  overflow: auto;
+}
+
+.ladder-shell {
+  min-width: 1440px;
+}
+
+.ladder {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.ladder th,
+.ladder td {
+  border-bottom: 1px solid #e0e7f0;
+  text-align: right;
+  padding: 4px 6px;
+  height: 28px;
+}
+
+.ladder th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f2f6fb;
+  font-weight: 700;
+}
+
+.strike-cell,
+.flag-cell {
+  text-align: center !important;
+}
+
+.msi-row {
+  background: rgba(69, 123, 157, 0.12);
+}
+
+.mtc-cell {
+  border: 2px solid #1d3557;
+}
+
+.muted {
+  opacity: 0.5;
+}
+
+.badge {
+  margin-left: 4px;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: #1d3557;
+  color: #fff;
+}
+
+.w-mid {
+  width: 74px;
+}
+
+.w-spr {
+  width: 60px;
+}
+
+.w-iv {
+  width: 56px;
+}
+
+.w-ivr {
+  width: 60px;
+}
+
+.w-d {
+  width: 48px;
+}
+
+.w-g {
+  width: 64px;
+}
+
+.w-v {
+  width: 56px;
+}
+
+.w-theta {
+  width: 56px;
+}
+
+.w-vol {
+  width: 70px;
+}
+
+.w-oi {
+  width: 70px;
+}
+
+.w-flags {
+  width: 48px;
+}
+
+.w-strike {
+  width: 78px;
+}
+
+@media (max-width: 1100px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
