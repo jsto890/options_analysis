@@ -62,3 +62,25 @@ export function formatCount(value: number | null): string {
   }
   return EN_US.format(value)
 }
+
+export function formatCompactSigned(value: number | null): string {
+  if (value === null) {
+    return "N A"
+  }
+  const sign = value > 0 ? "+" : value < 0 ? "-" : ""
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000) {
+    return `${sign}${(absolute / 1_000_000).toFixed(2)}M`
+  }
+  if (absolute >= 1_000) {
+    return `${sign}${(absolute / 1_000).toFixed(2)}K`
+  }
+  return `${sign}${absolute.toFixed(2)}`
+}
+
+export function formatSummaryPercent(value: number | null, decimals = 2): string {
+  if (value === null) {
+    return "N A"
+  }
+  return `${(value * 100).toFixed(decimals)}%`
+}
