@@ -65,6 +65,9 @@ function applyDelta(state: StreamState, envelope: DeltaEnvelope): StreamState {
     const current = nextRows[patch.strike]
     if (current) {
       nextRows[patch.strike] = { ...current, ...patch }
+    } else {
+      // New strike rows can arrive when the backend rolls the strike window.
+      nextRows[patch.strike] = patch as StrikeRow
     }
   }
 
