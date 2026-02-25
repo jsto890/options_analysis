@@ -57,7 +57,30 @@ def create_app(
 ) -> FastAPI:
     runtime_settings = settings or RuntimeSettings.from_env()
 
-    app = FastAPI(title="QQQ 0DTE Ladder Backend", version="1.0.0")
+    @contextlib.asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.heartbeat_task = asyncio.create_task(_heartbeat_loop(app))
+        app.state.refresh_task = asyncio.create_task(_refresh_loop(app))
+        if app.state.settings.startup_connect:
+            app.state.connect_task = asyncio.create_task(_connect_loop(app))
+
+        try:
+            yield
+        finally:
+            for task_name in ("heartbeat_task", "refresh_task", "connect_task"):
+                task = getattr(app.state, task_name)
+                if task:
+                    task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await task
+
+            for ws in list(app.state.clients):
+                await _remove_client(app, ws)
+
+            with contextlib.suppress(Exception):
+                await app.state.connector.disconnect()
+
+    app = FastAPI(title="QQQ 0DTE Ladder Backend", version="1.0.0", lifespan=lifespan)
     app.state.settings = runtime_settings
     app.state.config_store = config_store or ConfigStore()
     app.state.connector = connector or IBKRConnector(IBKRConfig.from_env())
@@ -71,28 +94,6 @@ def create_app(
     app.state.heartbeat_task: asyncio.Task | None = None
     app.state.refresh_task: asyncio.Task | None = None
     app.state.connect_task: asyncio.Task | None = None
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        app.state.heartbeat_task = asyncio.create_task(_heartbeat_loop(app))
-        app.state.refresh_task = asyncio.create_task(_refresh_loop(app))
-        if app.state.settings.startup_connect:
-            app.state.connect_task = asyncio.create_task(_connect_loop(app))
-
-    @app.on_event("shutdown")
-    async def shutdown_event() -> None:
-        for task_name in ("heartbeat_task", "refresh_task", "connect_task"):
-            task = getattr(app.state, task_name)
-            if task:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-
-        for ws in list(app.state.clients):
-            await _remove_client(app, ws)
-
-        with contextlib.suppress(Exception):
-            await app.state.connector.disconnect()
 
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
