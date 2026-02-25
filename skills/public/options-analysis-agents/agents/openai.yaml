@@ -1,0 +1,4 @@
+display_name: Options Analysis Agents
+short_description: Senior PM plus 3 agents for QQQ 0DTE console planning and phased delivery.
+default_prompt: |
+  Use the Options Analysis Agents skill to orchestrate Data Plane Engineer, Quant Analytics Engineer, and UI Systems Engineer under a Senior PM. Keep scope constrained to a local QQQ 0DTE analytics console with a +/-3% strike window, enforce PM check-in gates, and require evidence-backed claims.

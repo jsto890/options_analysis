@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Options Analysis Output",
+  "type": "object",
+  "required": [
+    "task_id",
+    "as_of",
+    "underlying",
+    "spot",
+    "strategy",
+    "legs",
+    "metrics",
+    "assumptions",
+    "scenarios",
+    "confidence"
+  ],
+  "properties": {
+    "task_id": {"type": "string"},
+    "as_of": {"type": "string"},
+    "underlying": {"type": "string"},
+    "spot": {"type": "number"},
+    "strategy": {"type": "string"},
+    "legs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["side", "type", "strike", "expiry", "quantity"],
+        "properties": {
+          "side": {"enum": ["long", "short"]},
+          "type": {"enum": ["call", "put"]},
+          "strike": {"type": "number"},
+          "expiry": {"type": "string"},
+          "quantity": {"type": "number"},
+          "premium": {"type": "number"}
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["cost", "max_loss", "max_profit", "breakevens", "greeks"],
+      "properties": {
+        "cost": {"type": "number"},
+        "max_loss": {"type": "number"},
+        "max_profit": {"type": ["number", "string"]},
+        "breakevens": {"type": "array", "items": {"type": "number"}},
+        "greeks": {
+          "type": "object",
+          "required": ["delta", "gamma", "theta", "vega"],
+          "properties": {
+            "delta": {"type": "number"},
+            "gamma": {"type": "number"},
+            "theta": {"type": "number"},
+            "vega": {"type": "number"},
+            "rho": {"type": ["number", "null"]}
+          }
+        }
+      }
+    },
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["date", "spot", "pnl"],
+        "properties": {
+          "date": {"type": "string"},
+          "spot": {"type": "number"},
+          "iv_shift": {"type": ["number", "null"]},
+          "pnl": {"type": "number"},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "disclaimers": {"type": "string"}
+  }
+}
