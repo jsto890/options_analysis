@@ -11,31 +11,72 @@ export function replayEnvelopes(
 export class PlaybackClient {
   private timer: ReturnType<typeof setTimeout> | null = null
   private index = 0
+  private running = false
 
   constructor(
     private readonly envelopes: AnyEnvelope[],
     private readonly onEnvelope: (envelope: AnyEnvelope) => void,
     private readonly cadenceMs = 500,
-    private readonly onDone?: () => void
+    private readonly onDone?: () => void,
+    private readonly onProgress?: (index: number, total: number) => void
   ) {}
 
   start(): void {
-    if (this.timer !== null) {
+    if (this.running) {
       return
     }
+    this.running = true
     this.tick()
   }
 
-  stop(): void {
+  pause(): void {
+    this.running = false
     if (this.timer !== null) {
       clearTimeout(this.timer)
       this.timer = null
     }
   }
 
+  resume(): void {
+    this.start()
+  }
+
+  restart(): void {
+    this.pause()
+    this.seek(0)
+    this.start()
+  }
+
+  stop(): void {
+    this.pause()
+  }
+
+  isRunning(): boolean {
+    return this.running
+  }
+
+  seek(nextIndex: number): void {
+    const clamped = Math.max(0, Math.min(this.envelopes.length, Math.floor(nextIndex)))
+    this.index = clamped
+    this.onProgress?.(this.index, this.envelopes.length)
+  }
+
+  getIndex(): number {
+    return this.index
+  }
+
+  getTotal(): number {
+    return this.envelopes.length
+  }
+
   private tick(): void {
+    if (!this.running) {
+      return
+    }
+
     if (this.index >= this.envelopes.length) {
       this.timer = null
+      this.running = false
       this.onDone?.()
       return
     }
@@ -43,6 +84,7 @@ export class PlaybackClient {
     const envelope = this.envelopes[this.index]
     this.index += 1
     this.onEnvelope(envelope)
+    this.onProgress?.(this.index, this.envelopes.length)
     this.timer = setTimeout(() => this.tick(), Math.max(1, this.cadenceMs))
   }
 }

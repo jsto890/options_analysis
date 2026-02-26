@@ -3,6 +3,8 @@ import type { StrikeRow } from "@/ws/types"
 
 interface Props {
   rows: StrikeRow[]
+  selectedStrike?: number | null
+  onSelectStrike?: (strike: number) => void
 }
 
 const WIDTH = 250
@@ -27,7 +29,7 @@ function linePath(points: Point[], minStrike: number, maxStrike: number, minIv: 
     .join(" ")
 }
 
-export function MiniIvChart({ rows }: Props): JSX.Element {
+export function MiniIvChart({ rows, selectedStrike = null, onSelectStrike }: Props): JSX.Element {
   const calls = rows
     .map((row) => ({ strike: row.strike, iv: row.call.iv }))
     .filter((point): point is Point => point.iv !== null)
@@ -60,7 +62,14 @@ export function MiniIvChart({ rows }: Props): JSX.Element {
           const x = PADDING_X + ((point.strike - minStrike) / xSpan) * (WIDTH - PADDING_X * 2)
           const y = PADDING_Y + (1 - (point.iv - minIv) / ySpan) * (HEIGHT - PADDING_Y * 2)
           return (
-            <circle key={`${point.strike}-${point.iv}-${index}`} cx={x} cy={y} r={2} className="chart-point">
+            <circle
+              key={`${point.strike}-${point.iv}-${index}-interactive`}
+              cx={x}
+              cy={y}
+              r={selectedStrike === point.strike ? 3.2 : 2.4}
+              className={`chart-point ${selectedStrike === point.strike ? "chart-point-selected" : ""}`.trim()}
+              onClick={() => onSelectStrike?.(point.strike)}
+            >
               <title>
                 {point.strike} | {formatIv(point.iv)}
               </title>

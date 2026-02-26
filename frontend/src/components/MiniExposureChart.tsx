@@ -3,6 +3,8 @@ import type { StrikeRow } from "@/ws/types"
 
 interface Props {
   rows: StrikeRow[]
+  selectedStrike?: number | null
+  onSelectStrike?: (strike: number) => void
 }
 
 const WIDTH = 250
@@ -10,7 +12,7 @@ const HEIGHT = 150
 const PADDING_X = 12
 const PADDING_Y = 12
 
-export function MiniExposureChart({ rows }: Props): JSX.Element {
+export function MiniExposureChart({ rows, selectedStrike = null, onSelectStrike }: Props): JSX.Element {
   const gexData = rows
     .map((row) => ({ strike: row.strike, gex: row.exposures.oi.gex ?? 0 }))
     .filter((row) => Number.isFinite(row.gex))
@@ -44,7 +46,10 @@ export function MiniExposureChart({ rows }: Props): JSX.Element {
               y={y}
               width={barWidth}
               height={Math.max(1, scaled)}
-              className={point.gex >= 0 ? "chart-bar-pos" : "chart-bar-neg"}
+              className={`${point.gex >= 0 ? "chart-bar-pos" : "chart-bar-neg"} ${
+                selectedStrike === point.strike ? "chart-bar-selected" : ""
+              }`.trim()}
+              onClick={() => onSelectStrike?.(point.strike)}
             >
               <title>
                 {point.strike} | {formatCompactSigned(point.gex)}

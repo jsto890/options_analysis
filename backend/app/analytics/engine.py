@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any
 
 from app.analytics.exposures import compute_exposures
@@ -20,6 +21,8 @@ class AnalyticsOutput:
     exposures_by_strike: dict
     msi: list[MSIResult]
     mtc: MTCSelection
+    iv_imbalance_by_contract: dict[str, bool]
+    extreme_greek_by_contract: dict[str, bool]
     residual_persistence_by_contract: dict[str, ResidualPersistence]
     residual_history_by_contract: dict[str, list[float | None]]
 
@@ -52,6 +55,7 @@ def run_analytics(
     )
 
     enriched_quotes = []
+    iv_imbalance_by_contract: dict[str, bool] = {}
     for quote in contract_quotes:
         q = dict(quote)
         contract_id = q.get("contract_id")
@@ -66,7 +70,43 @@ def run_analytics(
             and rp is not None
             and rp.is_imbalanced
         )
+        iv_imbalance_by_contract[str(contract_id)] = q["iv_imbalance"]
         enriched_quotes.append(q)
+
+    min_mid_for_extremes = float(config.get("min_mid_for_extremes", 0.05))
+    gamma_candidates: list[float] = []
+    for q in enriched_quotes:
+        gamma_per_dollar = q.get("gamma_per_dollar")
+        mid = q.get("mid")
+        if (
+            q.get("liquid", False)
+            and gamma_per_dollar is not None
+            and mid is not None
+            and mid >= min_mid_for_extremes
+        ):
+            gamma_candidates.append(abs(float(gamma_per_dollar)))
+
+    extreme_greek_by_contract: dict[str, bool] = {}
+    quantile_threshold = 0.0
+    if gamma_candidates:
+        sorted_gamma = sorted(gamma_candidates)
+        q_index = int(math.floor(0.9 * (len(sorted_gamma) - 1)))
+        quantile_threshold = sorted_gamma[q_index]
+
+    for q in enriched_quotes:
+        contract_id = str(q.get("contract_id", ""))
+        gamma_per_dollar = q.get("gamma_per_dollar")
+        mid = q.get("mid")
+        extreme = bool(
+            contract_id
+            and q.get("liquid", False)
+            and gamma_per_dollar is not None
+            and mid is not None
+            and mid >= min_mid_for_extremes
+            and abs(float(gamma_per_dollar)) >= quantile_threshold
+            and quantile_threshold > 0
+        )
+        extreme_greek_by_contract[contract_id] = extreme
 
     exposures_by_strike = compute_exposures(enriched_quotes, spot=spot)
     msi = compute_msi(
@@ -89,6 +129,8 @@ def run_analytics(
         exposures_by_strike=exposures_by_strike,
         msi=msi,
         mtc=mtc,
+        iv_imbalance_by_contract=iv_imbalance_by_contract,
+        extreme_greek_by_contract=extreme_greek_by_contract,
         residual_persistence_by_contract=residual_persistence,
         residual_history_by_contract=next_history,
     )

@@ -1,366 +1,1208 @@
 {
-    "openapi": "3.1.0",
-    "info": {
-      "title": "QQQ 0DTE Ladder Backend",
-      "version": "1.0.0"
-    },
-    "servers": [
-      {
-        "url": "http://127.0.0.1:8000"
+  "components": {
+    "schemas": {
+      "Config": {
+        "properties": {
+          "delta_band_max": {
+            "default": 0.65,
+            "title": "Delta Band Max",
+            "type": "number"
+          },
+          "delta_band_min": {
+            "default": 0.3,
+            "title": "Delta Band Min",
+            "type": "number"
+          },
+          "gex_band_pct": {
+            "default": 0.0075,
+            "title": "Gex Band Pct",
+            "type": "number"
+          },
+          "iv_imbalance_threshold": {
+            "default": -0.01,
+            "title": "Iv Imbalance Threshold",
+            "type": "number"
+          },
+          "iv_residual_scale": {
+            "default": 0.015,
+            "title": "Iv Residual Scale",
+            "type": "number"
+          },
+          "max_spread_pct": {
+            "default": 0.12,
+            "title": "Max Spread Pct",
+            "type": "number"
+          },
+          "max_stale_ms": {
+            "default": 1500,
+            "title": "Max Stale Ms",
+            "type": "integer"
+          },
+          "max_subscriptions_soft_limit": {
+            "default": 95,
+            "title": "Max Subscriptions Soft Limit",
+            "type": "integer"
+          },
+          "min_ask_size": {
+            "default": 10,
+            "title": "Min Ask Size",
+            "type": "integer"
+          },
+          "min_bid_size": {
+            "default": 10,
+            "title": "Min Bid Size",
+            "type": "integer"
+          },
+          "min_fit_points": {
+            "default": 8,
+            "title": "Min Fit Points",
+            "type": "integer"
+          },
+          "min_mid_for_extremes": {
+            "default": 0.05,
+            "title": "Min Mid For Extremes",
+            "type": "number"
+          },
+          "msi_bandwidth_pct": {
+            "default": 0.0075,
+            "title": "Msi Bandwidth Pct",
+            "type": "number"
+          },
+          "persistence_fraction": {
+            "default": 0.7,
+            "title": "Persistence Fraction",
+            "type": "number"
+          },
+          "persistence_updates": {
+            "default": 10,
+            "title": "Persistence Updates",
+            "type": "integer"
+          },
+          "roll_threshold_strikes": {
+            "default": 2,
+            "title": "Roll Threshold Strikes",
+            "type": "integer"
+          },
+          "update_interval_ms": {
+            "default": 500,
+            "title": "Update Interval Ms",
+            "type": "integer"
+          },
+          "window_strikes_each_side": {
+            "default": 20,
+            "title": "Window Strikes Each Side",
+            "type": "integer"
+          }
+        },
+        "title": "Config",
+        "type": "object"
+      },
+      "ConfigUpdate": {
+        "properties": {
+          "delta_band_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Band Max"
+          },
+          "delta_band_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Band Min"
+          },
+          "gex_band_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gex Band Pct"
+          },
+          "iv_imbalance_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iv Imbalance Threshold"
+          },
+          "iv_residual_scale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iv Residual Scale"
+          },
+          "max_spread_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Spread Pct"
+          },
+          "max_stale_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Stale Ms"
+          },
+          "max_subscriptions_soft_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Subscriptions Soft Limit"
+          },
+          "min_ask_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Ask Size"
+          },
+          "min_bid_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Bid Size"
+          },
+          "min_fit_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Fit Points"
+          },
+          "min_mid_for_extremes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Mid For Extremes"
+          },
+          "msi_bandwidth_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msi Bandwidth Pct"
+          },
+          "persistence_fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persistence Fraction"
+          },
+          "persistence_updates": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persistence Updates"
+          },
+          "roll_threshold_strikes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll Threshold Strikes"
+          },
+          "update_interval_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Update Interval Ms"
+          },
+          "window_strikes_each_side": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Strikes Each Side"
+          }
+        },
+        "title": "ConfigUpdate",
+        "type": "object"
+      },
+      "ContractBlock": {
+        "properties": {
+          "contract_id": {
+            "title": "Contract Id",
+            "type": "string"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "gamma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamma"
+          },
+          "highlights": {
+            "$ref": "#/components/schemas/ContractHighlights"
+          },
+          "iv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iv"
+          },
+          "iv_residual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iv Residual"
+          },
+          "liquid": {
+            "default": false,
+            "title": "Liquid",
+            "type": "boolean"
+          },
+          "mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mid"
+          },
+          "mtc_rationale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MtcRationale"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mtc_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtc Score"
+          },
+          "oi": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oi"
+          },
+          "per_dollar": {
+            "$ref": "#/components/schemas/PerDollarGreeks"
+          },
+          "spread_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spread Pct"
+          },
+          "stale_ms": {
+            "default": 0,
+            "title": "Stale Ms",
+            "type": "integer"
+          },
+          "theta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theta"
+          },
+          "vega": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vega"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "contract_id"
+        ],
+        "title": "ContractBlock",
+        "type": "object"
+      },
+      "ContractHighlights": {
+        "properties": {
+          "extreme_greek": {
+            "default": false,
+            "title": "Extreme Greek",
+            "type": "boolean"
+          },
+          "iv_imbalance": {
+            "default": false,
+            "title": "Iv Imbalance",
+            "type": "boolean"
+          },
+          "stale_level": {
+            "default": "fresh",
+            "enum": [
+              "fresh",
+              "stale",
+              "critical"
+            ],
+            "title": "Stale Level",
+            "type": "string"
+          }
+        },
+        "title": "ContractHighlights",
+        "type": "object"
+      },
+      "DesktopSettings": {
+        "properties": {
+          "client_id": {
+            "default": 19,
+            "minimum": 0.0,
+            "title": "Client Id",
+            "type": "integer"
+          },
+          "connect_paper": {
+            "default": false,
+            "title": "Connect Paper",
+            "type": "boolean"
+          },
+          "host": {
+            "default": "127.0.0.1",
+            "title": "Host",
+            "type": "string"
+          },
+          "live_port": {
+            "default": 4001,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Live Port",
+            "type": "integer"
+          },
+          "paper_port": {
+            "default": 4002,
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Paper Port",
+            "type": "integer"
+          }
+        },
+        "title": "DesktopSettings",
+        "type": "object"
+      },
+      "DesktopSettingsApplyResponse": {
+        "properties": {
+          "restart_required": {
+            "default": true,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DesktopSettings"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "title": "DesktopSettingsApplyResponse",
+        "type": "object"
+      },
+      "DesktopSettingsUpdate": {
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "connect_paper": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connect Paper"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "live_port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Port"
+          },
+          "paper_port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paper Port"
+          }
+        },
+        "title": "DesktopSettingsUpdate",
+        "type": "object"
+      },
+      "ExposureTriple": {
+        "properties": {
+          "dex": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dex"
+          },
+          "gex": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gex"
+          },
+          "vex": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vex"
+          }
+        },
+        "title": "ExposureTriple",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "ibkr_connected": {
+            "title": "Ibkr Connected",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_ts_ms": {
+            "title": "Server Ts Ms",
+            "type": "integer"
+          },
+          "subscriptions": {
+            "title": "Subscriptions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "server_ts_ms",
+          "ibkr_connected",
+          "subscriptions"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "MtcRationale": {
+        "properties": {
+          "cheap_iv_score": {
+            "title": "Cheap Iv Score",
+            "type": "number"
+          },
+          "efficiency_score": {
+            "title": "Efficiency Score",
+            "type": "number"
+          },
+          "gate_delta_band": {
+            "title": "Gate Delta Band",
+            "type": "boolean"
+          },
+          "gate_liquid": {
+            "title": "Gate Liquid",
+            "type": "boolean"
+          },
+          "liquidity_score": {
+            "title": "Liquidity Score",
+            "type": "number"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "stability_score": {
+            "title": "Stability Score",
+            "type": "number"
+          },
+          "tradable_score": {
+            "title": "Tradable Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "liquidity_score",
+          "cheap_iv_score",
+          "efficiency_score",
+          "stability_score",
+          "tradable_score",
+          "gate_liquid",
+          "gate_delta_band"
+        ],
+        "title": "MtcRationale",
+        "type": "object"
+      },
+      "PerDollarGreeks": {
+        "properties": {
+          "gamma_per_dollar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamma Per Dollar"
+          },
+          "theta_per_dollar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theta Per Dollar"
+          },
+          "vega_per_dollar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vega Per Dollar"
+          }
+        },
+        "required": [
+          "gamma_per_dollar",
+          "vega_per_dollar",
+          "theta_per_dollar"
+        ],
+        "title": "PerDollarGreeks",
+        "type": "object"
+      },
+      "RowFlags": {
+        "properties": {
+          "is_atm": {
+            "default": false,
+            "title": "Is Atm",
+            "type": "boolean"
+          },
+          "is_msi": {
+            "default": false,
+            "title": "Is Msi",
+            "type": "boolean"
+          },
+          "wall_type": {
+            "default": "none",
+            "enum": [
+              "none",
+              "call_wall",
+              "put_wall"
+            ],
+            "title": "Wall Type",
+            "type": "string"
+          }
+        },
+        "title": "RowFlags",
+        "type": "object"
+      },
+      "StateSnapshot": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/Config"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/StrikeRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "underlying": {
+            "$ref": "#/components/schemas/UnderlyingState"
+          }
+        },
+        "required": [
+          "underlying",
+          "config",
+          "summary"
+        ],
+        "title": "StateSnapshot",
+        "type": "object"
+      },
+      "StrikeExposures": {
+        "properties": {
+          "oi": {
+            "$ref": "#/components/schemas/ExposureTriple"
+          },
+          "vol": {
+            "$ref": "#/components/schemas/ExposureTriple"
+          }
+        },
+        "title": "StrikeExposures",
+        "type": "object"
+      },
+      "StrikeRow": {
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/ContractBlock"
+          },
+          "exposures": {
+            "$ref": "#/components/schemas/StrikeExposures"
+          },
+          "flags": {
+            "$ref": "#/components/schemas/RowFlags"
+          },
+          "msi_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msi Score"
+          },
+          "put": {
+            "$ref": "#/components/schemas/ContractBlock"
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "strike",
+          "call",
+          "put"
+        ],
+        "title": "StrikeRow",
+        "type": "object"
+      },
+      "Summary": {
+        "properties": {
+          "atm_strike": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atm Strike"
+          },
+          "msi_strikes": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Msi Strikes",
+            "type": "array"
+          },
+          "mtc_call_contract_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtc Call Contract Id"
+          },
+          "mtc_put_contract_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mtc Put Contract Id"
+          },
+          "nearest_msi_distance_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nearest Msi Distance Pct"
+          },
+          "net_gex_band": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Gex Band"
+          },
+          "pin_risk": {
+            "default": 0.0,
+            "title": "Pin Risk",
+            "type": "number"
+          }
+        },
+        "title": "Summary",
+        "type": "object"
+      },
+      "UnderlyingSpot": {
+        "properties": {
+          "ask": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask"
+          },
+          "bid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bid"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mid"
+          },
+          "ts_ms": {
+            "default": 0,
+            "title": "Ts Ms",
+            "type": "integer"
+          }
+        },
+        "title": "UnderlyingSpot",
+        "type": "object"
+      },
+      "UnderlyingState": {
+        "properties": {
+          "expiry": {
+            "default": "",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "spot": {
+            "$ref": "#/components/schemas/UnderlyingSpot"
+          },
+          "symbol": {
+            "default": "QQQ",
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "title": "UnderlyingState",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
-    ],
-    "paths": {
-      "/health": {
-        "get": {
-          "summary": "Health check",
-          "responses": {
-            "200": {
-              "description": "Health response",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/HealthResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "/state": {
-        "get": {
-          "summary": "Full state snapshot for debugging",
-          "responses": {
-            "200": {
-              "description": "State snapshot",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/StateSnapshot"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "/config": {
-        "post": {
-          "summary": "Update runtime config and persist locally",
-          "requestBody": {
-            "required": true,
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigUpdate"
-                }
+    }
+  },
+  "info": {
+    "title": "QQQ 0DTE Ladder Backend",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/config": {
+      "post": {
+        "operationId": "update_config_config_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdate"
               }
             }
           },
-          "responses": {
-            "200": {
-              "description": "Updated config",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Config"
-                  }
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             },
-            "422": {
-              "description": "Validation error"
-            }
+            "description": "Validation Error"
           }
-        }
-      },
-      "/stream": {
-        "get": {
-          "summary": "WebSocket endpoint for live stream",
-          "description": "This is a WebSocket endpoint. OpenAPI documents it for discovery only. See websocket_schema.json for message schemas.",
-          "responses": {
-            "101": {
-              "description": "Switching Protocols"
-            }
-          }
-        }
+        },
+        "summary": "Update Config"
       }
     },
-    "components": {
-      "schemas": {
-        "HealthResponse": {
-          "type": "object",
-          "required": [
-            "ok",
-            "server_ts_ms",
-            "ibkr_connected",
-            "subscriptions"
-          ],
-          "properties": {
-            "ok": { "type": "boolean" },
-            "server_ts_ms": { "type": "integer" },
-            "ibkr_connected": { "type": "boolean" },
-            "subscriptions": { "type": "integer" }
-          }
-        },
-        "UnderlyingSpot": {
-          "type": "object",
-          "required": [
-            "bid",
-            "ask",
-            "last",
-            "mid",
-            "ts_ms"
-          ],
-          "properties": {
-            "bid": { "type": ["number", "null"] },
-            "ask": { "type": ["number", "null"] },
-            "last": { "type": ["number", "null"] },
-            "mid": { "type": ["number", "null"] },
-            "ts_ms": { "type": "integer" }
-          }
-        },
-        "PerDollarGreeks": {
-          "type": "object",
-          "required": [
-            "gamma_per_dollar",
-            "vega_per_dollar",
-            "theta_per_dollar"
-          ],
-          "properties": {
-            "gamma_per_dollar": { "type": ["number", "null"] },
-            "vega_per_dollar": { "type": ["number", "null"] },
-            "theta_per_dollar": { "type": ["number", "null"] }
-          }
-        },
-        "MtcRationale": {
-          "type": "object",
-          "required": [
-            "liquidity_score",
-            "cheap_iv_score",
-            "efficiency_score",
-            "stability_score",
-            "tradable_score",
-            "gate_liquid",
-            "gate_delta_band",
-            "notes"
-          ],
-          "properties": {
-            "liquidity_score": { "type": "number" },
-            "cheap_iv_score": { "type": "number" },
-            "efficiency_score": { "type": "number" },
-            "stability_score": { "type": "number" },
-            "tradable_score": { "type": "number" },
-            "gate_liquid": { "type": "boolean" },
-            "gate_delta_band": { "type": "boolean" },
-            "notes": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-        "ContractBlock": {
-          "type": "object",
-          "required": [
-            "contract_id",
-            "mid",
-            "iv",
-            "iv_residual",
-            "delta",
-            "gamma",
-            "vega",
-            "theta",
-            "spread_pct",
-            "volume",
-            "oi",
-            "liquid",
-            "stale_ms",
-            "per_dollar",
-            "mtc_score",
-            "mtc_rationale"
-          ],
-          "properties": {
-            "contract_id": { "type": "string" },
-            "mid": { "type": ["number", "null"] },
-            "iv": { "type": ["number", "null"] },
-            "iv_residual": { "type": ["number", "null"] },
-            "delta": { "type": ["number", "null"] },
-            "gamma": { "type": ["number", "null"] },
-            "vega": { "type": ["number", "null"] },
-            "theta": { "type": ["number", "null"] },
-            "spread_pct": { "type": ["number", "null"] },
-            "volume": { "type": ["integer", "null"] },
-            "oi": { "type": ["integer", "null"] },
-            "liquid": { "type": "boolean" },
-            "stale_ms": { "type": "integer" },
-            "per_dollar": { "$ref": "#/components/schemas/PerDollarGreeks" },
-            "mtc_score": { "type": ["number", "null"] },
-            "mtc_rationale": { "oneOf": [ { "$ref": "#/components/schemas/MtcRationale" }, { "type": "null" } ] }
-          }
-        },
-        "StrikeExposures": {
-          "type": "object",
-          "required": [
-            "oi",
-            "vol"
-          ],
-          "properties": {
-            "oi": {
-              "type": "object",
-              "required": ["dex", "gex", "vex"],
-              "properties": {
-                "dex": { "type": ["number", "null"] },
-                "gex": { "type": ["number", "null"] },
-                "vex": { "type": ["number", "null"] }
+    "/desktop/settings": {
+      "get": {
+        "operationId": "get_desktop_settings_desktop_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopSettings"
+                }
               }
             },
-            "vol": {
-              "type": "object",
-              "required": ["dex", "gex", "vex"],
-              "properties": {
-                "dex": { "type": ["number", "null"] },
-                "gex": { "type": ["number", "null"] },
-                "vex": { "type": ["number", "null"] }
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Desktop Settings"
+      },
+      "post": {
+        "operationId": "update_desktop_settings_desktop_settings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopSettingsUpdate"
               }
             }
-          }
+          },
+          "required": true
         },
-        "RowFlags": {
-          "type": "object",
-          "required": [
-            "is_msi",
-            "wall_type"
-          ],
-          "properties": {
-            "is_msi": { "type": "boolean" },
-            "wall_type": { "type": "string", "enum": ["none", "call_wall", "put_wall"] }
-          }
-        },
-        "StrikeRow": {
-          "type": "object",
-          "required": [
-            "strike",
-            "msi_score",
-            "flags",
-            "call",
-            "put",
-            "exposures"
-          ],
-          "properties": {
-            "strike": { "type": "number" },
-            "msi_score": { "type": ["number", "null"] },
-            "flags": { "$ref": "#/components/schemas/RowFlags" },
-            "call": { "$ref": "#/components/schemas/ContractBlock" },
-            "put": { "$ref": "#/components/schemas/ContractBlock" },
-            "exposures": { "$ref": "#/components/schemas/StrikeExposures" }
-          }
-        },
-        "Summary": {
-          "type": "object",
-          "required": [
-            "net_gex_band",
-            "pin_risk",
-            "msi_strikes",
-            "mtc_call_contract_id",
-            "mtc_put_contract_id",
-            "nearest_msi_distance_pct"
-          ],
-          "properties": {
-            "net_gex_band": { "type": ["number", "null"] },
-            "pin_risk": { "type": "number" },
-            "msi_strikes": { "type": "array", "items": { "type": "number" } },
-            "mtc_call_contract_id": { "type": ["string", "null"] },
-            "mtc_put_contract_id": { "type": ["string", "null"] },
-            "nearest_msi_distance_pct": { "type": ["number", "null"] }
-          }
-        },
-        "Config": {
-          "type": "object",
-          "required": [
-            "update_interval_ms",
-            "window_strikes_each_side",
-            "roll_threshold_strikes",
-            "max_spread_pct",
-            "min_bid_size",
-            "min_ask_size",
-            "max_stale_ms",
-            "min_fit_points",
-            "delta_band_min",
-            "delta_band_max",
-            "msi_bandwidth_pct",
-            "gex_band_pct",
-            "persistence_updates",
-            "persistence_fraction",
-            "iv_residual_scale",
-            "iv_imbalance_threshold",
-            "min_mid_for_extremes",
-            "max_subscriptions_soft_limit"
-          ],
-          "properties": {
-            "update_interval_ms": { "type": "integer" },
-            "window_strikes_each_side": { "type": "integer" },
-            "roll_threshold_strikes": { "type": "integer" },
-            "max_spread_pct": { "type": "number" },
-            "min_bid_size": { "type": "integer" },
-            "min_ask_size": { "type": "integer" },
-            "max_stale_ms": { "type": "integer" },
-            "min_fit_points": { "type": "integer" },
-            "delta_band_min": { "type": "number" },
-            "delta_band_max": { "type": "number" },
-            "msi_bandwidth_pct": { "type": "number" },
-            "gex_band_pct": { "type": "number" },
-            "persistence_updates": { "type": "integer" },
-            "persistence_fraction": { "type": "number" },
-            "iv_residual_scale": { "type": "number" },
-            "iv_imbalance_threshold": { "type": "number" },
-            "min_mid_for_extremes": { "type": "number" },
-            "max_subscriptions_soft_limit": { "type": "integer" }
-          }
-        },
-        "ConfigUpdate": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "update_interval_ms": { "type": "integer" },
-            "window_strikes_each_side": { "type": "integer" },
-            "roll_threshold_strikes": { "type": "integer" },
-            "max_spread_pct": { "type": "number" },
-            "min_bid_size": { "type": "integer" },
-            "min_ask_size": { "type": "integer" },
-            "max_stale_ms": { "type": "integer" },
-            "min_fit_points": { "type": "integer" },
-            "delta_band_min": { "type": "number" },
-            "delta_band_max": { "type": "number" },
-            "msi_bandwidth_pct": { "type": "number" },
-            "gex_band_pct": { "type": "number" },
-            "persistence_updates": { "type": "integer" },
-            "persistence_fraction": { "type": "number" },
-            "iv_residual_scale": { "type": "number" },
-            "iv_imbalance_threshold": { "type": "number" },
-            "min_mid_for_extremes": { "type": "number" },
-            "max_subscriptions_soft_limit": { "type": "integer" }
-          }
-        },
-        "StateSnapshot": {
-          "type": "object",
-          "required": [
-            "underlying",
-            "config",
-            "summary",
-            "rows"
-          ],
-          "properties": {
-            "underlying": {
-              "type": "object",
-              "required": ["symbol", "expiry", "spot"],
-              "properties": {
-                "symbol": { "type": "string" },
-                "expiry": { "type": "string" },
-                "spot": { "$ref": "#/components/schemas/UnderlyingSpot" }
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopSettingsApplyResponse"
+                }
               }
             },
-            "config": { "$ref": "#/components/schemas/Config" },
-            "summary": { "$ref": "#/components/schemas/Summary" },
-            "rows": { "type": "array", "items": { "$ref": "#/components/schemas/StrikeRow" } }
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
-        }
+        },
+        "summary": "Update Desktop Settings"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/state": {
+      "get": {
+        "operationId": "state_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "State"
       }
     }
   }
+}

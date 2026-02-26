@@ -90,4 +90,48 @@ describe("playback", () => {
     expect(seenTypes).toEqual(["snapshot", "heartbeat"])
     vi.useRealTimers()
   })
+
+  it("PlaybackClient supports pause/resume/restart", () => {
+    vi.useFakeTimers()
+    const envelopes = sampleEnvelopes()
+    const seenTypes: string[] = []
+    const client = new PlaybackClient(envelopes, (envelope) => seenTypes.push(envelope.type), 50)
+
+    client.start()
+    vi.advanceTimersByTime(1)
+    expect(seenTypes).toEqual(["snapshot"])
+
+    client.pause()
+    vi.advanceTimersByTime(200)
+    expect(seenTypes).toEqual(["snapshot"])
+
+    client.resume()
+    vi.advanceTimersByTime(60)
+    expect(seenTypes).toEqual(["snapshot", "heartbeat"])
+
+    client.restart()
+    vi.advanceTimersByTime(1)
+    expect(seenTypes).toEqual(["snapshot", "heartbeat", "snapshot"])
+
+    client.stop()
+    vi.useRealTimers()
+  })
+
+  it("PlaybackClient seek updates index and dispatch order", () => {
+    vi.useFakeTimers()
+    const envelopes = sampleEnvelopes()
+    const seenTypes: string[] = []
+    const client = new PlaybackClient(envelopes, (envelope) => seenTypes.push(envelope.type), 50)
+
+    client.seek(1)
+    expect(client.getIndex()).toBe(1)
+    expect(client.getTotal()).toBe(2)
+
+    client.start()
+    vi.advanceTimersByTime(1)
+    expect(seenTypes).toEqual(["heartbeat"])
+
+    client.stop()
+    vi.useRealTimers()
+  })
 })

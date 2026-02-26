@@ -24,6 +24,7 @@ interface Props {
   series: ContractSeriesPoint[]
   onClose: () => void
   onCopyContract: (includeConid: boolean) => void
+  onJumpToStrike: (strike: number) => void
 }
 
 const SPARK_WIDTH = 250
@@ -49,15 +50,45 @@ function sparkPath(values: number[]): string {
     .join(" ")
 }
 
+interface TrendBadge {
+  label: "UP" | "DOWN" | "FLAT"
+  className: "trend-up" | "trend-down" | "trend-flat"
+}
+
+function deriveTrend(values: Array<number | null>): TrendBadge {
+  const compact = values.filter((value): value is number => value !== null)
+  if (compact.length < 2) {
+    return { label: "FLAT", className: "trend-flat" }
+  }
+
+  const startIndex = Math.max(0, compact.length - 6)
+  const start = compact[startIndex]
+  const end = compact[compact.length - 1]
+  const base = Math.max(Math.abs(start), 0.000001)
+  const movement = (end - start) / base
+
+  if (Math.abs(movement) < 0.01) {
+    return { label: "FLAT", className: "trend-flat" }
+  }
+  if (movement > 0) {
+    return { label: "UP", className: "trend-up" }
+  }
+  return { label: "DOWN", className: "trend-down" }
+}
+
 function Sparkline({ label, values, latest }: { label: string; values: Array<number | null>; latest: string }): JSX.Element {
   const compact = values.filter((value): value is number => value !== null)
   const path = sparkPath(compact)
+  const trend = deriveTrend(values)
 
   return (
     <div className="spark-card">
       <div className="spark-head">
         <span>{label}</span>
-        <strong>{latest}</strong>
+        <div className="spark-head-right">
+          <span className={`trend-badge ${trend.className}`}>{trend.label}</span>
+          <strong>{latest}</strong>
+        </div>
       </div>
       <svg width={SPARK_WIDTH} height={SPARK_HEIGHT} viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}>
         {path ? <path d={path} className="spark-line" /> : null}
@@ -74,7 +105,8 @@ export function PinnedDetailDrawer({
   row,
   series,
   onClose,
-  onCopyContract
+  onCopyContract,
+  onJumpToStrike
 }: Props): JSX.Element {
   if (!selection || !row) {
     return (
@@ -104,6 +136,9 @@ export function PinnedDetailDrawer({
       </p>
 
       <div className="drawer-actions">
+        <button type="button" onClick={() => onJumpToStrike(selection.strike)}>
+          Jump to Strike
+        </button>
         <button type="button" onClick={() => onCopyContract(false)}>
           Copy Contract
         </button>

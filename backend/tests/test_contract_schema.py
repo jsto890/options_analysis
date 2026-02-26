@@ -6,8 +6,23 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def load_repo_json(filename: str) -> dict:
+    root = repo_root()
+    candidates = [
+        root / filename,
+        root / "documents" / filename,
+    ]
+
+    for path in candidates:
+        if path.exists():
+            return json.loads(path.read_text())
+
+    joined = ", ".join(str(path) for path in candidates)
+    raise FileNotFoundError(f"None of the candidate paths exist: {joined}")
+
+
 def test_openapi_version_and_per_dollar_fields():
-    data = json.loads((repo_root() / "openapi.json").read_text())
+    data = load_repo_json("openapi.json")
     assert data["openapi"] == "3.1.0"
 
     per_dollar = data["components"]["schemas"]["PerDollarGreeks"]
@@ -19,7 +34,7 @@ def test_openapi_version_and_per_dollar_fields():
 
 
 def test_websocket_schema_exists_and_envelopes():
-    schema = json.loads((repo_root() / "websocket_schema.json").read_text())
+    schema = load_repo_json("websocket_schema.json")
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
 
     kinds = {
@@ -37,7 +52,7 @@ def test_websocket_schema_exists_and_envelopes():
 
 
 def test_default_config_matches_schema_shape():
-    cfg = json.loads((repo_root() / "config.default.json").read_text())
+    cfg = load_repo_json("config.default.json")
     assert "filename" not in cfg
     required_keys = {
         "update_interval_ms",

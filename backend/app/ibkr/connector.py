@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from ib_insync import IB, Option, Stock, Ticker, util as ib_util
+from ib_insync import client as ib_client
 from ib_insync import connection as ib_connection
 from ib_insync.contract import Contract
 from ib_insync.objects import BarDataList
@@ -28,6 +29,10 @@ class IBKRConnector:
         self.ib = IB()
         self.connected = False
         self.current_market_data_type: Optional[int] = None
+        self._bound_loop: asyncio.AbstractEventLoop | None = None
+        self._original_util_get_loop = ib_util.getLoop
+        self._original_client_get_loop = ib_client.getLoop
+        self._original_connection_get_loop = ib_connection.getLoop
         if self.config.read_only:
             self._enforce_read_only()
 
@@ -56,11 +61,13 @@ class IBKRConnector:
 
     async def disconnect(self) -> None:
         if not self.connected:
+            self._unbind_ib_loop()
             return
         try:
             self.ib.disconnect()
         finally:
             self.connected = False
+            self._unbind_ib_loop()
 
     def is_connected(self) -> bool:
         return self.connected and self.ib.isConnected()
@@ -233,20 +240,36 @@ class IBKRConnector:
 
     @contextlib.contextmanager
     def _bound_ib_loop(self):
-        running_loop = asyncio.get_running_loop()
-        original_get_loop = ib_util.getLoop
-        original_connection_get_loop = ib_connection.getLoop
+        self._bind_ib_loop(asyncio.get_running_loop())
+        yield
 
-        def _current_loop():
-            return running_loop
+    def _bind_ib_loop(self, running_loop: asyncio.AbstractEventLoop) -> None:
+        self._bound_loop = running_loop
 
-        ib_util.getLoop = _current_loop
-        ib_connection.getLoop = _current_loop
-        try:
-            yield
-        finally:
-            ib_util.getLoop = original_get_loop
-            ib_connection.getLoop = original_connection_get_loop
+        def _current_util_loop():
+            if self._bound_loop is not None and not self._bound_loop.is_closed():
+                return self._bound_loop
+            return self._original_util_get_loop()
+
+        def _current_connection_loop():
+            if self._bound_loop is not None and not self._bound_loop.is_closed():
+                return self._bound_loop
+            return self._original_connection_get_loop()
+
+        def _current_client_loop():
+            if self._bound_loop is not None and not self._bound_loop.is_closed():
+                return self._bound_loop
+            return self._original_client_get_loop()
+
+        ib_util.getLoop = _current_util_loop
+        ib_client.getLoop = _current_client_loop
+        ib_connection.getLoop = _current_connection_loop
+
+    def _unbind_ib_loop(self) -> None:
+        self._bound_loop = None
+        ib_util.getLoop = self._original_util_get_loop
+        ib_client.getLoop = self._original_client_get_loop
+        ib_connection.getLoop = self._original_connection_get_loop
 
     def _enforce_read_only(self) -> None:
         def _blocked(*_args, **_kwargs):

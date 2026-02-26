@@ -6,21 +6,25 @@ interface Props {
   side: "Call" | "Put"
   block: ContractBlock | null
   onCopyContract: (contractId: string | null, includeConid: boolean) => void
+  onSelectContract?: (contractId: string | null) => void
 }
 
 function fmt(value: number): string {
   return value.toFixed(2)
 }
 
-export function MtcRationaleCard({ side, block, onCopyContract }: Props): JSX.Element {
+export function MtcRationaleCard({ side, block, onCopyContract, onSelectContract }: Props): JSX.Element {
   const contractId = block?.contract_id ?? null
   const rationale: MtcRationale | null = block?.mtc_rationale ?? null
 
   return (
-    <div className="rationale-card">
+    <div className={`rationale-card ${side === "Call" ? "rationale-call" : "rationale-put"}`}>
       <h4>{side} MTC</h4>
       <p className="rationale-contract">{formatContractDescriptor(contractId)}</p>
       <div className="rationale-actions">
+        <button type="button" onClick={() => onSelectContract?.(contractId)} disabled={!contractId}>
+          Focus
+        </button>
         <button type="button" onClick={() => onCopyContract(contractId, false)}>
           Copy
         </button>

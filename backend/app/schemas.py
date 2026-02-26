@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 WallType = Literal["none", "call_wall", "put_wall"]
+StaleLevel = Literal["fresh", "stale", "critical"]
 
 
 class UnderlyingSpot(BaseModel):
@@ -17,9 +18,9 @@ class UnderlyingSpot(BaseModel):
 
 
 class PerDollarGreeks(BaseModel):
-    gamma_per_dollar: float | None = None
-    vega_per_dollar: float | None = None
-    theta_per_dollar: float | None = None
+    gamma_per_dollar: float | None
+    vega_per_dollar: float | None
+    theta_per_dollar: float | None
 
 
 class MtcRationale(BaseModel):
@@ -31,6 +32,12 @@ class MtcRationale(BaseModel):
     gate_liquid: bool
     gate_delta_band: bool
     notes: list[str] = Field(default_factory=list)
+
+
+class ContractHighlights(BaseModel):
+    iv_imbalance: bool = False
+    extreme_greek: bool = False
+    stale_level: StaleLevel = "fresh"
 
 
 class ContractBlock(BaseModel):
@@ -47,7 +54,14 @@ class ContractBlock(BaseModel):
     oi: int | None = None
     liquid: bool = False
     stale_ms: int = 0
-    per_dollar: PerDollarGreeks = Field(default_factory=PerDollarGreeks)
+    per_dollar: PerDollarGreeks = Field(
+        default_factory=lambda: PerDollarGreeks(
+            gamma_per_dollar=None,
+            vega_per_dollar=None,
+            theta_per_dollar=None,
+        )
+    )
+    highlights: ContractHighlights = Field(default_factory=ContractHighlights)
     mtc_score: float | None = None
     mtc_rationale: MtcRationale | None = None
 
@@ -65,6 +79,7 @@ class StrikeExposures(BaseModel):
 
 class RowFlags(BaseModel):
     is_msi: bool = False
+    is_atm: bool = False
     wall_type: WallType = "none"
 
 
@@ -81,6 +96,7 @@ class Summary(BaseModel):
     net_gex_band: float | None = None
     pin_risk: float = 0.0
     msi_strikes: list[float] = Field(default_factory=list)
+    atm_strike: float | None = None
     mtc_call_contract_id: str | None = None
     mtc_put_contract_id: str | None = None
     nearest_msi_distance_pct: float | None = None
@@ -126,6 +142,27 @@ class ConfigUpdate(BaseModel):
     iv_imbalance_threshold: float | None = None
     min_mid_for_extremes: float | None = None
     max_subscriptions_soft_limit: int | None = None
+
+
+class DesktopSettings(BaseModel):
+    connect_paper: bool = False
+    client_id: int = Field(default=19, ge=0)
+    host: str = "127.0.0.1"
+    paper_port: int = Field(default=4002, ge=1, le=65535)
+    live_port: int = Field(default=4001, ge=1, le=65535)
+
+
+class DesktopSettingsUpdate(BaseModel):
+    connect_paper: bool | None = None
+    client_id: int | None = Field(default=None, ge=0)
+    host: str | None = None
+    paper_port: int | None = Field(default=None, ge=1, le=65535)
+    live_port: int | None = Field(default=None, ge=1, le=65535)
+
+
+class DesktopSettingsApplyResponse(BaseModel):
+    settings: DesktopSettings
+    restart_required: bool = True
 
 
 class UnderlyingState(BaseModel):

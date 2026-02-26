@@ -5,21 +5,29 @@ import contextlib
 import logging
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import Path
 from time import time
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from ib_insync.contract import Contract
 
 from app.analytics.engine import AnalyticsOutput, run_analytics
 from app.config_store import ConfigStore
+from app.desktop.settings_store import DesktopSettingsStore
 from app.ibkr.config import IBKRConfig
 from app.ibkr.connector import IBKRConnector
 from app.ibkr.window_manager import StrikeWindowManager
 from app.schemas import (
     ConfigUpdate,
     ContractBlock,
+    DesktopSettings,
+    DesktopSettingsApplyResponse,
+    DesktopSettingsUpdate,
     HealthResponse,
     HeartbeatPayload,
     MtcRationale,
@@ -40,14 +48,21 @@ class RuntimeSettings:
     client_queue_size: int = 32
     queue_drop_log_interval_seconds: float = 10.0
     startup_connect: bool = False
-    connect_retry_seconds: float = 5.0
-    paper_trading: bool = True
+    connect_retry_seconds: float = 10.0
+    paper_trading: bool = False
+    desktop_mode: bool = False
+    app_data_dir: str | None = None
+    frontend_dist_dir: str | None = None
 
     @classmethod
     def from_env(cls) -> "RuntimeSettings":
         return cls(
             startup_connect=os.getenv("IBKR_AUTO_CONNECT", "0") == "1",
-            paper_trading=os.getenv("IBKR_CONNECT_PAPER", "1") == "1",
+            paper_trading=os.getenv("IBKR_CONNECT_PAPER", "0") == "1",
+            connect_retry_seconds=max(1.0, float(os.getenv("IBKR_CONNECT_RETRY_SECONDS", "10"))),
+            desktop_mode=os.getenv("OPTIONS_DESKTOP_MODE", "0") == "1",
+            app_data_dir=os.getenv("OPTIONS_APP_DATA_DIR"),
+            frontend_dist_dir=os.getenv("OPTIONS_FRONTEND_DIST_DIR"),
         )
 
 
@@ -79,17 +94,56 @@ def now_ms() -> int:
     return int(time() * 1000)
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_frontend_dist_dir(configured_dir: str | None) -> Path:
+    if configured_dir:
+        return Path(configured_dir).expanduser()
+    return _repo_root() / "frontend" / "dist"
+
+
+def _resolve_app_data_dir(configured_dir: str | None) -> Path:
+    if configured_dir:
+        return Path(configured_dir).expanduser()
+    return Path.home() / "Library" / "Application Support" / "OptionsAnalysis"
+
+
+def _merge_ibkr_config(base: IBKRConfig, desktop_settings: DesktopSettings | None) -> IBKRConfig:
+    if desktop_settings is None:
+        return base
+    return IBKRConfig(
+        host=desktop_settings.host,
+        paper_port=desktop_settings.paper_port,
+        live_port=desktop_settings.live_port,
+        client_id=desktop_settings.client_id,
+        timeout_seconds=base.timeout_seconds,
+        market_data_type=base.market_data_type,
+        read_only=base.read_only,
+    )
+
+
 def create_app(
     settings: RuntimeSettings | None = None,
     config_store: ConfigStore | None = None,
     connector: IBKRConnector | Any | None = None,
+    desktop_settings_store: DesktopSettingsStore | None = None,
 ) -> FastAPI:
     runtime_settings = settings or RuntimeSettings.from_env()
+    app_data_dir = _resolve_app_data_dir(runtime_settings.app_data_dir)
+    frontend_dist_dir = _resolve_frontend_dist_dir(runtime_settings.frontend_dist_dir)
+
+    resolved_desktop_settings_store = desktop_settings_store or DesktopSettingsStore(app_data_dir=app_data_dir)
+    desktop_settings = resolved_desktop_settings_store.settings if runtime_settings.desktop_mode else None
+    if desktop_settings is not None:
+        runtime_settings = replace(runtime_settings, paper_trading=desktop_settings.connect_paper)
+    ibkr_config = _merge_ibkr_config(IBKRConfig.from_env(), desktop_settings)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         if app.state.connector is None:
-            app.state.connector = IBKRConnector(IBKRConfig.from_env())
+            app.state.connector = IBKRConnector(app.state.ibkr_config)
         app.state.heartbeat_task = asyncio.create_task(_heartbeat_loop(app))
         app.state.refresh_task = asyncio.create_task(_refresh_loop(app))
         if app.state.settings.startup_connect:
@@ -113,8 +167,27 @@ def create_app(
                     await app.state.connector.disconnect()
 
     app = FastAPI(title="QQQ 0DTE Ladder Backend", version="1.0.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://127.0.0.1:4173",
+            "http://localhost:4173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.settings = runtime_settings
-    app.state.config_store = config_store or ConfigStore()
+    app.state.desktop_mode = runtime_settings.desktop_mode
+    app.state.app_data_dir = app_data_dir
+    app.state.frontend_dist_dir = frontend_dist_dir
+    app.state.desktop_settings_store = resolved_desktop_settings_store
+    app.state.desktop_settings = desktop_settings or resolved_desktop_settings_store.settings
+    app.state.ibkr_config = ibkr_config
+    local_config_dir = app_data_dir if runtime_settings.desktop_mode else None
+    app.state.config_store = config_store or ConfigStore(local_dir=local_config_dir)
     app.state.connector = connector
     app.state.store = RuntimeStore(build_default_snapshot(app.state.config_store.config))
     app.state.window_manager = StrikeWindowManager(
@@ -135,6 +208,29 @@ def create_app(
         contract_by_id={},
         ticker_by_id={},
     )
+    assets_dir = app.state.frontend_dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+
+    @app.get("/app", include_in_schema=False, response_class=FileResponse, response_model=None)
+    async def serve_app():
+        index_path = app.state.frontend_dist_dir / "index.html"
+        if not index_path.exists():
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Frontend bundle not found. Run frontend build before launching desktop mode."},
+            )
+        return FileResponse(index_path)
+
+    @app.get("/desktop/settings", response_model=DesktopSettings)
+    async def get_desktop_settings() -> DesktopSettings:
+        return app.state.desktop_settings_store.settings
+
+    @app.post("/desktop/settings", response_model=DesktopSettingsApplyResponse)
+    async def update_desktop_settings(update: DesktopSettingsUpdate) -> DesktopSettingsApplyResponse:
+        settings_after = app.state.desktop_settings_store.update(update)
+        app.state.desktop_settings = settings_after
+        return DesktopSettingsApplyResponse(settings=settings_after, restart_required=True)
 
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
@@ -164,6 +260,7 @@ def create_app(
                 roll_threshold_strikes=updated.roll_threshold_strikes,
             )
 
+        app.state.market_data.force_snapshot_broadcast = True
         return updated
 
     @app.websocket("/stream")
@@ -738,6 +835,7 @@ def _build_contract_quotes(snapshot: StateSnapshot) -> list[dict[str, Any]]:
                     "contract_id": block.contract_id,
                     "right": right,
                     "strike": row.strike,
+                    "mid": block.mid,
                     "model_iv": block.iv,
                     "liquid": block.liquid,
                     "model_delta": block.delta,
@@ -770,6 +868,7 @@ def _apply_analytics(snapshot: StateSnapshot, analytics: AnalyticsOutput, spot: 
     snapshot.summary.nearest_msi_distance_pct = (
         min(abs(strike - spot) / spot for strike in msi_strikes) if msi_strikes and spot > 0 else None
     )
+    snapshot.summary.atm_strike = _nearest_strike(snapshot.rows, spot)
 
     if spot > 0:
         net_gex_band = 0.0
@@ -785,6 +884,7 @@ def _apply_analytics(snapshot: StateSnapshot, analytics: AnalyticsOutput, spot: 
         msi = msi_by_strike.get(row.strike)
         row.msi_score = msi.msi_score if msi else None
         row.flags.is_msi = msi is not None
+        row.flags.is_atm = row.strike == snapshot.summary.atm_strike
         row.flags.wall_type = msi.wall_type if msi else "none"
 
         exposure = analytics.exposures_by_strike.get(row.strike)
@@ -796,16 +896,37 @@ def _apply_analytics(snapshot: StateSnapshot, analytics: AnalyticsOutput, spot: 
             row.exposures.vol.gex = exposure.vol.gex
             row.exposures.vol.vex = exposure.vol.vex
 
-        _apply_contract_analytics(row.call, analytics, analytics.mtc.best_call)
-        _apply_contract_analytics(row.put, analytics, analytics.mtc.best_put)
+        _apply_contract_analytics(
+            row.call,
+            analytics,
+            analytics.mtc.best_call,
+            max_stale_ms=snapshot.config.max_stale_ms,
+        )
+        _apply_contract_analytics(
+            row.put,
+            analytics,
+            analytics.mtc.best_put,
+            max_stale_ms=snapshot.config.max_stale_ms,
+        )
+
+
+def _nearest_strike(rows: list[StrikeRow], spot: float) -> float | None:
+    if spot <= 0 or not rows:
+        return None
+    return min(rows, key=lambda row: abs(row.strike - spot)).strike
 
 
 def _apply_contract_analytics(
     block: ContractBlock,
     analytics: AnalyticsOutput,
     mtc_selection: Any,
+    *,
+    max_stale_ms: int,
 ) -> None:
     block.iv_residual = analytics.iv_fit.residual_by_contract.get(block.contract_id)
+    block.highlights.iv_imbalance = analytics.iv_imbalance_by_contract.get(block.contract_id, False)
+    block.highlights.extreme_greek = analytics.extreme_greek_by_contract.get(block.contract_id, False)
+    block.highlights.stale_level = _stale_level(block.stale_ms, max_stale_ms)
 
     if mtc_selection is None or block.contract_id != mtc_selection.contract_id:
         block.mtc_score = None
@@ -830,6 +951,14 @@ def _apply_contract_analytics(
         gate_delta_band=rationale.gate_delta_band,
         notes=notes,
     )
+
+
+def _stale_level(stale_ms: int, max_stale_ms: int) -> str:
+    if stale_ms > max_stale_ms * 3:
+        return "critical"
+    if stale_ms > max_stale_ms:
+        return "stale"
+    return "fresh"
 
 
 def _subscription_count(app: FastAPI) -> int:
