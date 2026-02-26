@@ -291,7 +291,13 @@ def create_app(
 async def _connect_loop(app: FastAPI) -> None:
     while True:
         if not app.state.connector.is_connected():
-            connected = await app.state.connector.connect(paper=app.state.settings.paper_trading)
+            try:
+                connected = await app.state.connector.connect(paper=app.state.settings.paper_trading)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.error("IBKR connect loop error: %s", exc)
+                connected = False
             if connected:
                 await _bootstrap_market_data(app)
         elif not app.state.market_data.market_ready:

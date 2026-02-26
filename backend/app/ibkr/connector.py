@@ -28,6 +28,7 @@ class IBKRConnector:
         self.config = config
         self.ib = IB()
         self.connected = False
+        self.active_client_id = config.client_id
         self.current_market_data_type: Optional[int] = None
         self._bound_loop: asyncio.AbstractEventLoop | None = None
         self._original_util_get_loop = ib_util.getLoop
@@ -38,26 +39,104 @@ class IBKRConnector:
 
     async def connect(self, paper: bool = True) -> bool:
         port = self.config.paper_port if paper else self.config.live_port
-        try:
-            with self._bound_ib_loop():
-                await self.ib.connectAsync(
-                    host=self.config.host,
-                    port=port,
-                    clientId=self.config.client_id,
-                    timeout=self.config.timeout_seconds,
-                )
-            self.connected = True
-            self.set_market_data_type(self.config.market_data_type)
-            logger.info("Connected to IBKR at %s:%s", self.config.host, port)
-            return True
-        except Exception as exc:
-            self.connected = self.ib.isConnected()
-            if self.connected:
-                logger.warning("Connect raised warning but session is active: %s", exc)
+        for client_id in self._candidate_client_ids():
+            attempt_error_codes: list[int] = []
+
+            def _capture_error(_req_id, error_code, _error_string, _contract=None):
+                with contextlib.suppress(Exception):
+                    attempt_error_codes.append(int(error_code))
+
+            error_event = getattr(self.ib, "errorEvent", None)
+            has_error_event = error_event is not None
+            if has_error_event:
+                with contextlib.suppress(Exception):
+                    error_event += _capture_error
+            try:
+                with self._bound_ib_loop():
+                    await self.ib.connectAsync(
+                        host=self.config.host,
+                        port=port,
+                        clientId=client_id,
+                        timeout=self.config.timeout_seconds,
+                    )
+                    # Give ib_insync a short event-loop turn to process async error callbacks.
+                    await asyncio.sleep(0.05)
+
+                if not self.ib.isConnected():
+                    if 326 in attempt_error_codes:
+                        raise RuntimeError("Error 326, reqId -1: Unable to connect as the client id is already in use.")
+                    raise RuntimeError("IBKR connect returned without an active session")
+                self.connected = True
+                self.active_client_id = client_id
                 self.set_market_data_type(self.config.market_data_type)
+                if client_id != self.config.client_id:
+                    logger.warning(
+                        "Connected to IBKR at %s:%s using fallback client id %s (configured %s was unavailable)",
+                        self.config.host,
+                        port,
+                        client_id,
+                        self.config.client_id,
+                    )
+                else:
+                    logger.info("Connected to IBKR at %s:%s", self.config.host, port)
                 return True
-            logger.error("Failed to connect to IBKR: %s", exc)
-            return False
+            except asyncio.CancelledError as exc:
+                self.connected = self.ib.isConnected()
+                if self.connected:
+                    self.active_client_id = client_id
+                    logger.warning("Connect raised cancellation but session is active: %s", exc)
+                    self.set_market_data_type(self.config.market_data_type)
+                    return True
+
+                if self._is_client_id_in_use(exc) or 326 in attempt_error_codes:
+                    with contextlib.suppress(Exception):
+                        self.ib.disconnect()
+                    logger.warning(
+                        "IBKR client id %s is already in use on %s:%s",
+                        client_id,
+                        self.config.host,
+                        port,
+                    )
+                    continue
+
+                task = asyncio.current_task()
+                if task is not None and task.cancelling() > 0:
+                    raise
+
+                logger.error("Failed to connect to IBKR: %s", exc)
+                return False
+            except Exception as exc:
+                self.connected = self.ib.isConnected()
+                if self.connected:
+                    self.active_client_id = client_id
+                    logger.warning("Connect raised warning but session is active: %s", exc)
+                    self.set_market_data_type(self.config.market_data_type)
+                    return True
+
+                if self._is_client_id_in_use(exc):
+                    with contextlib.suppress(Exception):
+                        self.ib.disconnect()
+                    logger.warning(
+                        "IBKR client id %s is already in use on %s:%s",
+                        client_id,
+                        self.config.host,
+                        port,
+                    )
+                    continue
+
+                logger.error("Failed to connect to IBKR: %s", exc)
+                return False
+            finally:
+                if has_error_event:
+                    with contextlib.suppress(Exception):
+                        error_event -= _capture_error
+
+        logger.error(
+            "Failed to connect to IBKR: client ids %s through %s are already in use",
+            self.config.client_id,
+            self.config.client_id + 9,
+        )
+        return False
 
     async def disconnect(self) -> None:
         if not self.connected:
@@ -282,3 +361,12 @@ class IBKRConnector:
         self.ib.cancelOrderAsync = _blocked  # type: ignore[method-assign]
         self.ib.reqOpenOrders = _blocked  # type: ignore[method-assign]
         self.ib.reqAllOpenOrders = _blocked  # type: ignore[method-assign]
+
+    def _candidate_client_ids(self) -> list[int]:
+        start = max(0, int(self.active_client_id))
+        return [start + offset for offset in range(10)]
+
+    @staticmethod
+    def _is_client_id_in_use(exc: Exception) -> bool:
+        message = str(exc).lower()
+        return "client id is already in use" in message or "error 326" in message
