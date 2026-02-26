@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from datetime import datetime
 from typing import Optional
 
-from ib_insync import IB, Option, Stock, Ticker
+from ib_insync import IB, Option, Stock, Ticker, util as ib_util
+from ib_insync import connection as ib_connection
 from ib_insync.contract import Contract
 from ib_insync.objects import BarDataList
 
@@ -31,18 +34,23 @@ class IBKRConnector:
     async def connect(self, paper: bool = True) -> bool:
         port = self.config.paper_port if paper else self.config.live_port
         try:
-            await self.ib.connectAsync(
-                host=self.config.host,
-                port=port,
-                clientId=self.config.client_id,
-                timeout=self.config.timeout_seconds,
-            )
+            with self._bound_ib_loop():
+                await self.ib.connectAsync(
+                    host=self.config.host,
+                    port=port,
+                    clientId=self.config.client_id,
+                    timeout=self.config.timeout_seconds,
+                )
             self.connected = True
             self.set_market_data_type(self.config.market_data_type)
             logger.info("Connected to IBKR at %s:%s", self.config.host, port)
             return True
         except Exception as exc:
-            self.connected = False
+            self.connected = self.ib.isConnected()
+            if self.connected:
+                logger.warning("Connect raised warning but session is active: %s", exc)
+                self.set_market_data_type(self.config.market_data_type)
+                return True
             logger.error("Failed to connect to IBKR: %s", exc)
             return False
 
@@ -97,15 +105,16 @@ class IBKRConnector:
         if not end_date:
             end_date = datetime.now().strftime("%Y%m%d %H:%M:%S")
         try:
-            return await self.ib.reqHistoricalDataAsync(
-                contract,
-                endDateTime=end_date,
-                durationStr=duration,
-                barSizeSetting=bar_size,
-                whatToShow="TRADES",
-                useRTH=True,
-                formatDate=1,
-            )
+            with self._bound_ib_loop():
+                return await self.ib.reqHistoricalDataAsync(
+                    contract,
+                    endDateTime=end_date,
+                    durationStr=duration,
+                    barSizeSetting=bar_size,
+                    whatToShow="TRADES",
+                    useRTH=True,
+                    formatDate=1,
+                )
         except Exception as exc:
             logger.error("Failed historical data request: %s", exc)
             return None
@@ -114,32 +123,71 @@ class IBKRConnector:
         if not self.is_connected():
             return []
         try:
-            underlying = Stock(symbol, "SMART", "USD")
-            qualified = await self.ib.qualifyContractsAsync(underlying)
-            if not qualified:
+            qualified_underlying = await self.qualify_underlying(symbol)
+            if qualified_underlying is None:
                 return []
-            contract = qualified[0]
-            chains = await self.ib.reqSecDefOptParamsAsync(
-                contract.symbol,
-                "",
-                contract.secType,
-                int(contract.conId),
-            )
+            contract = qualified_underlying
+            with self._bound_ib_loop():
+                chains = await self.ib.reqSecDefOptParamsAsync(
+                    contract.symbol,
+                    "",
+                    contract.secType,
+                    int(contract.conId),
+                )
         except Exception as exc:
             logger.error("Failed option chain request: %s", exc)
             return []
 
         today = datetime.now().date()
-        options: list[Contract] = []
+        by_expiry: dict[str, set[float]] = {}
         for chain in chains:
             for expiry in chain.expirations:
                 dte = (datetime.strptime(expiry, "%Y%m%d").date() - today).days
                 if dte < min_dte or dte > max_dte:
                     continue
+                strike_set = by_expiry.setdefault(expiry, set())
                 for strike in chain.strikes:
-                    options.append(Option(underlying.symbol, expiry, strike, "C", "SMART"))
-                    options.append(Option(underlying.symbol, expiry, strike, "P", "SMART"))
+                    if strike <= 0:
+                        continue
+                    strike_float = float(strike)
+                    # Filter out non-standard increments seen in noisy chain metadata.
+                    if abs((strike_float * 2.0) - round(strike_float * 2.0)) > 1e-6:
+                        continue
+                    strike_set.add(strike_float)
+
+        options: list[Contract] = []
+        for expiry in sorted(by_expiry):
+            for strike in sorted(by_expiry[expiry]):
+                options.append(Option(contract.symbol, expiry, strike, "C", "SMART"))
+                options.append(Option(contract.symbol, expiry, strike, "P", "SMART"))
         return options
+
+    async def qualify_underlying(self, symbol: str = "QQQ") -> Optional[Contract]:
+        if not self.is_connected():
+            return None
+        try:
+            underlying = Stock(symbol, "SMART", "USD")
+            with self._bound_ib_loop():
+                qualified = await self.ib.qualifyContractsAsync(underlying)
+            for contract in qualified:
+                conid = int(getattr(contract, "conId", 0) or 0)
+                if conid > 0:
+                    return contract
+            return None
+        except Exception as exc:
+            logger.error("Failed to qualify underlying contract: %s", exc)
+            return None
+
+    async def qualify_contracts(self, contracts: list[Contract]) -> list[Contract]:
+        if not self.is_connected() or not contracts:
+            return []
+        try:
+            with self._bound_ib_loop():
+                qualified = list(await self.ib.qualifyContractsAsync(*contracts))
+            return [c for c in qualified if int(getattr(c, "conId", 0) or 0) > 0]
+        except Exception as exc:
+            logger.error("Failed to qualify %s contracts: %s", len(contracts), exc)
+            return []
 
     async def subscribe_underlying_stream(self, symbol: str = "QQQ") -> Optional[Ticker]:
         if not self.is_connected():
@@ -159,6 +207,12 @@ class IBKRConnector:
             logger.error("Failed option stream subscription: %s", exc)
             return None
 
+    def cancel_market_data(self, contract: Contract) -> None:
+        if not self.is_connected():
+            return
+        with contextlib.suppress(Exception):
+            self.ib.cancelMktData(contract)
+
     async def _request_market_data(
         self,
         contract: Contract,
@@ -166,14 +220,33 @@ class IBKRConnector:
         regulatory: bool = False,
     ) -> Optional[Ticker]:
         if hasattr(self.ib, "reqMktDataAsync"):
-            return await self.ib.reqMktDataAsync(contract, "", snapshot, regulatory)
+            with self._bound_ib_loop():
+                return await self.ib.reqMktDataAsync(contract, "", snapshot, regulatory)
 
         # Backward compatibility for older ib_insync builds used by SPYbot.
         if snapshot:
-            tickers = await self.ib.reqTickersAsync(contract)
+            with self._bound_ib_loop():
+                tickers = await self.ib.reqTickersAsync(contract)
             return tickers[0] if tickers else None
 
         return self.ib.reqMktData(contract, "", False, regulatory)
+
+    @contextlib.contextmanager
+    def _bound_ib_loop(self):
+        running_loop = asyncio.get_running_loop()
+        original_get_loop = ib_util.getLoop
+        original_connection_get_loop = ib_connection.getLoop
+
+        def _current_loop():
+            return running_loop
+
+        ib_util.getLoop = _current_loop
+        ib_connection.getLoop = _current_loop
+        try:
+            yield
+        finally:
+            ib_util.getLoop = original_get_loop
+            ib_connection.getLoop = original_connection_get_loop
 
     def _enforce_read_only(self) -> None:
         def _blocked(*_args, **_kwargs):

@@ -5,144 +5,139 @@ _Project root: `/Users/josephstorey/OptionsAnalysis`_
 
 ## 1) Execution Timeline (Chronological)
 
-### Phase 0: Branch and repo hygiene
-- Renamed kickoff file in git history to canonical casing (`KICKOFF_PLAN.md` -> `Kickoff_Plan.md`).
-- Added root `.gitignore` and removed committed cache artifacts (`__pycache__`, test cache outputs).
-- Established/used subagent branches:
+### Phase 0: Branch + repo hygiene
+- Renamed kickoff plan file to canonical casing (`Kickoff_Plan.md`).
+- Added root `.gitignore` and cleaned tracked cache artifacts.
+- Established kickoff branches:
   - `codex/subagent-a-kickoff-data-plane`
   - `codex/subagent-b-kickoff-analytics`
   - `codex/subagent-c-kickoff-ui-system`
 
-### Phase 1: Subagent A data-plane runtime scaffold + hardening
-- Implemented runtime websocket/data-plane scaffolding and tests:
+### Phase 1: Subagent A data-plane scaffold
+- Implemented backend REST + websocket runtime shell:
   - `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/state/store.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/window_manager.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/tests/test_backend_runtime.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/tests/test_window_manager.py`
-- Added websocket queue drop policy and snapshot/delta/heartbeat flow.
-- Fixed window boundary logic bug in strike-window manager.
-- Added backend refresh compute budget guard (`p95 < 50ms`):
-  - `/Users/josephstorey/OptionsAnalysis/backend/tests/test_refresh_budget.py`
-- Migrated FastAPI lifecycle handling from deprecated startup/shutdown events to lifespan.
+- Added heartbeat loop, bounded per-client WS queue, snapshot/delta flow.
+- Added refresh compute budget guard (`p95 < 50ms`) and runtime tests.
 
-Validation evidence:
-- `PYTHONPATH=backend pytest -q backend` on A branch -> `13 passed, 1 skipped`
+Validation:
+- `PYTHONPATH=backend pytest -q backend` (A branch) -> `13 passed, 1 skipped`
 
-### Phase 2: Subagent B analytics contract upgrade
-- Implemented/extended analytics modules:
+### Phase 2: Subagent B analytics contracts
+- Implemented analytics stack:
   - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/iv_surface.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/exposures.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/msi_mtc.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/engine.py`
-- Added rolling residual persistence and IV imbalance persistence scoring.
-- Added explicit MTC rationale payload object with gate/component details.
-- Added deterministic tests for residual persistence threshold crossing and MSI stability under perturbation.
+- Added persistence logic and deterministic MTC rationale contract.
 
-Validation evidence:
-- `PYTHONPATH=backend pytest -q backend` on B branch -> `14 passed, 1 skipped`
+Validation:
+- `PYTHONPATH=backend pytest -q backend` (B branch) -> `14 passed, 1 skipped`
 
-### Phase 3: Subagent C UI system + reducer/playback stability
-- Implemented frontend scaffold and rendering pipeline:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/StrikeLadder.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/reducer.ts`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/format.ts`
-- Fixed reducer bug where new-row delta patches were ignored.
-- Added playback path and parity tests:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/playback.ts`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/playback.test.ts`
+### Phase 3: Subagent C UI system baseline
+- Implemented ladder scaffold, reducer contract handling, and playback baseline.
+- Fixed reducer handling for row insert patches.
+- Added formatting utilities and tests.
 
-Validation evidence:
+Validation:
 - `npm --prefix frontend test -- --run` -> pass
 - `npm --prefix frontend run build` -> pass
-- Backend smoke on C branch: `PYTHONPATH=backend pytest -q backend` -> pass
 
-### Phase 4: PM integration branch (cross-agent merge validation)
-- Created branch: `codex/pm-integration-check` from current A.
-- Merged B and C branch heads into integration branch.
-- Full-suite integration validation passed:
-  - Backend: `PYTHONPATH=backend pytest -q backend` -> `21 passed, 1 skipped` (then `22 passed, 1 skipped` after runtime analytics wiring)
-  - Frontend tests: pass
-  - Frontend build: pass
-- Added runtime analytics wiring in backend refresh loop:
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/tests/test_backend_runtime.py`
-- Added UI summary formatting contract compliance (net GEX compact signed, nearest MSI percent):
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/format.ts`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/format.test.ts`
-- Added MTC rationale cards in right panel summary:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/MtcRationaleCard.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/styles.css`
-- Pushed integration branch to origin.
+### Phase 4: PM integration + merge choreography
+- Created integration branch `codex/pm-integration-check`.
+- Merged B + C onto A integration baseline and validated combined behavior.
+- Applied PM integration commits for runtime analytics wiring and summary formatting.
+- Completed required merge order into `main`:
+  1. A merged first
+  2. B/C rebased on post-A main
+  3. B/C merged
+  4. PM integration commits cherry-picked
 
-### Phase 5: Merge execution to main (post-TWS disconnect)
-- Executed requested merge choreography:
-  1. Merged A to `main` first.
-  2. Rebased B and C onto post-A `main` and force-pushed retargeted branches.
-  3. Merged rebased B and C into `main`.
-  4. Cherry-picked PM integration commits (`1d938e0`, `c6d1d98`, `503486a`) into `main`.
-- Pushed final `main` to origin: `origin/main` now includes A+B+C plus PM integration enhancements.
-- Full validation on merged `main`:
-  - Backend: `22 passed, 1 skipped`
-  - Frontend tests: `3 files passed, 9 tests`
-  - Frontend build: success
-- Live IBKR validation deferred until tomorrow by instruction because TWS was disconnected.
+Validation:
+- Backend on merged main: `22 passed, 1 skipped`
+- Frontend tests/build on merged main: pass
 
-## 2) Current Branch/Status Snapshot
+### Phase 5: Live runtime activation and backend hardening
+- Extended connector runtime behavior:
+  - loop-binding patch for async IB calls
+  - contract qualification helpers
+  - option subscription cancellation helper
+- Completed live ingestion/runtime window machinery in `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`:
+  - underlying + chain bootstrap
+  - expiry selection and active-window subscription
+  - ticker ingestion into row contract blocks
+  - paced add/remove subscription rolling
+  - forced snapshot contract on window changes
+- Added runtime store diff baseline sync to avoid stale-delta artifacts.
 
-### Subagent A (`codex/subagent-a-kickoff-data-plane`)
+Validation:
+- `PYTHONPATH=backend pytest -q backend` -> `22 passed, 1 skipped`
+- Live health/state checks report connected backend, populated expiry, 41 ladder rows, MTC ids.
+- Live smoke: `IBKR_CLIENT_ID=29 PYTHONPATH=backend python backend/scripts/ibkr_smoke.py --symbol QQQ --with-option --live` -> OK
+
+### Phase 6: Frontend advanced surfaces completion
+- Added detail drawer + pinned selection workflow:
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/PinnedDetailDrawer.tsx`
+  - row/contract selection wiring in `/Users/josephstorey/OptionsAnalysis/frontend/src/components/StrikeLadder.tsx`
+  - selection + keyboard navigation in `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
+- Added compact right-panel charts:
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/MiniIvChart.tsx`
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/MiniExposureChart.tsx`
+- Added deterministic contract copy descriptor utility:
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/contracts.ts`
+- Added rolling contract timeseries cache:
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/timeseries.ts`
+- Added live playback parity fixture and tests:
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/fixtures/live_session.sample.json`
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/live_playback_parity.test.ts`
+
+Validation:
+- `npm --prefix frontend test -- --run` -> `6 files passed, 14 tests`
+- `npm --prefix frontend run build` -> success
+
+## 2) Current Completion Snapshot
+
+### Subagent A
 Completed:
-- Runtime scaffolding, WS contract loops, delta store, window manager, lifecycle hardening, budget test.
-Not completed:
-- Full live tick ingestion -> analytics input wiring is only fully available on PM integration branch after B merge.
-
-### Subagent B (`codex/subagent-b-kickoff-analytics`)
-Completed:
-- Pure analytics functions, persistence logic, MTC rationale payload contract, deterministic tests.
-Not completed:
-- Runtime consumption in isolated B branch (resolved in PM integration branch).
-
-### Subagent C (`codex/subagent-c-kickoff-ui-system`)
-Completed:
-- Ladder scaffold, stable reducers, playback path, basic summary cards.
+- Live ingestion pipeline, rolling subscriptions, runtime analytics integration, backend test suite green.
 In progress:
-- Advanced UI surfaces (rationale drawer/charts/full detail panel) still pending.
+- 60-minute soak evidence and large-move roll event capture for final acceptance artifact.
 
-### PM integration (`codex/pm-integration-check`)
+### Subagent B
 Completed:
-- Cross-agent merged validation.
-- Runtime analytics bridge + summary formatting refinements.
-Status:
-- Green test/build state and ready for final merge choreography.
+- Analytics contracts and deterministic tests.
+In progress:
+- Optional diagnostics/smoothing fields remain deferred.
+
+### Subagent C
+Completed:
+- Ladder, reducers, playback baseline, summary cards, rationale details, detail drawer, chart surfaces, copy actions, parity fixture.
+In progress:
+- UI playback controls for pause/seek are still deferred from strict full-SPEC behavior.
 
 ## 3) Remaining Work (Actionable)
 
-1. Backend data-plane completion (live session pending)
-- Connect real IBKR tick ingestion to runtime row updates and window roll execution (cancel/add pacing path).
-- Validate with live market data during session open/active periods.
+1. Backend acceptance evidence
+- Run one 60-minute live soak and archive subscription/roll logs.
+- Capture one confirmed roll event with strike window transition details.
 
-2. Frontend completion
-- Add detail drawer for per-dollar greek drilldown and expanded rationale details.
-- Add small summary chart surfaces (if still in scoped v1).
-- Validate real recording playback parity vs live stream with recorded dataset.
+2. Optional frontend playback controls
+- If required for release, add play/pause/seek controls and tests that reducer state after seek remains deterministic.
 
-3. PR/automation ops
-- `gh` auth is currently unavailable in shell (`gh auth login` required).
-- Draft PR updates/creation need authenticated `gh` session.
+3. PR automation readiness
+- Restore `gh` shell authentication before any PR automation workflow.
 
 ## 4) References for Next Context
 - Spec source of truth: `/Users/josephstorey/OptionsAnalysis/SPEC.md`
 - Kickoff contract: `/Users/josephstorey/OptionsAnalysis/Kickoff_Plan.md`
-- PM status matrix: `/Users/josephstorey/PM_STATUS_MATRIX.md`
-- Integration branch to resume from: `codex/pm-integration-check`
+- PM status matrix: `/Users/josephstorey/OptionsAnalysis/PM_STATUS_MATRIX.md`
 - High-signal backend files:
   - `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`
   - `/Users/josephstorey/OptionsAnalysis/backend/app/state/store.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/engine.py`
+  - `/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/connector.py`
 - High-signal frontend files:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/reducer.ts`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/playback.ts`
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
   - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/StrikeLadder.tsx`
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/PinnedDetailDrawer.tsx`
+  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/live_playback_parity.test.ts`

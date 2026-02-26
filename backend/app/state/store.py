@@ -18,11 +18,20 @@ class RuntimeStore:
 
     def __init__(self, snapshot: StateSnapshot):
         self.snapshot = snapshot
-        self._last_sent = snapshot.model_copy(deep=True)
+        self._last_spot = snapshot.underlying.spot.model_dump()
+        self._last_summary = snapshot.summary.model_dump()
+        self._last_rows_by_strike = {row.strike: row.model_dump() for row in snapshot.rows}
         self._force_next_delta = False
 
     def force_delta(self) -> None:
         self._force_next_delta = True
+
+    def sync_baseline(self) -> None:
+        """Aligns the internal diff baseline with the current snapshot without emitting a delta."""
+        self._last_spot = self.snapshot.underlying.spot.model_dump()
+        self._last_summary = self.snapshot.summary.model_dump()
+        self._last_rows_by_strike = {row.strike: row.model_dump() for row in self.snapshot.rows}
+        self._force_next_delta = False
 
     def update_config(self, config: Config) -> None:
         self.snapshot.config = config
@@ -50,31 +59,31 @@ class RuntimeStore:
 
     def compute_delta(self) -> DeltaEnvelopePayload | None:
         current = self.snapshot
-        prev = self._last_sent
-
         underlying_patch: dict[str, Any] = {}
-        if current.underlying.spot.model_dump() != prev.underlying.spot.model_dump():
-            underlying_patch["spot"] = current.underlying.spot.model_dump()
+        current_spot = current.underlying.spot.model_dump()
+        if current_spot != self._last_spot:
+            underlying_patch["spot"] = current_spot
 
         summary_patch: dict[str, Any] = {}
         current_summary = current.summary.model_dump()
-        prev_summary = prev.summary.model_dump()
         for key, value in current_summary.items():
-            if prev_summary.get(key) != value:
+            if self._last_summary.get(key) != value:
                 summary_patch[key] = value
 
-        prev_by_strike = {row.strike: row for row in prev.rows}
+        current_rows_by_strike: dict[float, dict[str, Any]] = {}
         row_patches: list[dict[str, Any]] = []
         for row in current.rows:
-            prev_row = prev_by_strike.get(row.strike)
             row_dump = row.model_dump()
-            if prev_row is None or prev_row.model_dump() != row_dump:
+            current_rows_by_strike[row.strike] = row_dump
+            if self._last_rows_by_strike.get(row.strike) != row_dump:
                 row_patches.append(row_dump)
 
         if not self._force_next_delta and not underlying_patch and not summary_patch and not row_patches:
             return None
 
-        self._last_sent = current.model_copy(deep=True)
+        self._last_spot = current_spot
+        self._last_summary = current_summary
+        self._last_rows_by_strike = current_rows_by_strike
         self._force_next_delta = False
 
         return DeltaEnvelopePayload(
