@@ -84,3 +84,24 @@ export function formatSummaryPercent(value: number | null, decimals = 2): string
   }
   return `${(value * 100).toFixed(decimals)}%`
 }
+
+export function formatQualityScore(score: number | null | undefined): string {
+  if (score === null || score === undefined) {
+    return "N A"
+  }
+  return `${Math.round(score * 100)}`
+}
+
+export function formatLatency(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) {
+    return "N A"
+  }
+  return `${Math.max(0, Math.round(ms))} ms`
+}
+
+export function formatMarketRegime(regime: string | null | undefined): string {
+  if (!regime) {
+    return "UNKNOWN"
+  }
+  return regime.replace("_", " ").toUpperCase()
+}

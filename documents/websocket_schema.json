@@ -467,6 +467,37 @@
             "number",
             "null"
           ]
+        },
+        "market_regime": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "pinning",
+            "trend",
+            "transition",
+            "unknown",
+            null
+          ]
+        },
+        "data_quality_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fresh_contract_ratio": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stream_latency_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       }
     },

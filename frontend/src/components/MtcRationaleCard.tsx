@@ -7,13 +7,22 @@ interface Props {
   block: ContractBlock | null
   onCopyContract: (contractId: string | null, includeConid: boolean) => void
   onSelectContract?: (contractId: string | null) => void
+  onToggleCompare?: (contractId: string | null) => void
+  compared?: boolean
 }
 
 function fmt(value: number): string {
   return value.toFixed(2)
 }
 
-export function MtcRationaleCard({ side, block, onCopyContract, onSelectContract }: Props): JSX.Element {
+export function MtcRationaleCard({
+  side,
+  block,
+  onCopyContract,
+  onSelectContract,
+  onToggleCompare,
+  compared = false
+}: Props): JSX.Element {
   const contractId = block?.contract_id ?? null
   const rationale: MtcRationale | null = block?.mtc_rationale ?? null
 
@@ -24,6 +33,9 @@ export function MtcRationaleCard({ side, block, onCopyContract, onSelectContract
       <div className="rationale-actions">
         <button type="button" onClick={() => onSelectContract?.(contractId)} disabled={!contractId}>
           Focus
+        </button>
+        <button type="button" onClick={() => onToggleCompare?.(contractId)} disabled={!contractId}>
+          {compared ? "Uncompare" : "Compare"}
         </button>
         <button type="button" onClick={() => onCopyContract(contractId, false)}>
           Copy
@@ -46,9 +58,17 @@ export function MtcRationaleCard({ side, block, onCopyContract, onSelectContract
             <dt>Stability</dt>
             <dd>{fmt(rationale.stability_score)}</dd>
             <dt>Liquid Gate</dt>
-            <dd>{rationale.gate_liquid ? "PASS" : "FAIL"}</dd>
+            <dd>
+              <span className={`gate-badge ${rationale.gate_liquid ? "pass" : "fail"}`}>
+                {rationale.gate_liquid ? "PASS" : "FAIL"}
+              </span>
+            </dd>
             <dt>Delta Gate</dt>
-            <dd>{rationale.gate_delta_band ? "PASS" : "FAIL"}</dd>
+            <dd>
+              <span className={`gate-badge ${rationale.gate_delta_band ? "pass" : "fail"}`}>
+                {rationale.gate_delta_band ? "PASS" : "FAIL"}
+              </span>
+            </dd>
             <dt>Spread</dt>
             <dd>{formatSpreadPct(block?.spread_pct ?? null)}</dd>
             <dt>Staleness</dt>
@@ -64,7 +84,15 @@ export function MtcRationaleCard({ side, block, onCopyContract, onSelectContract
             <dt>Theta/$</dt>
             <dd>{block?.per_dollar.theta_per_dollar === null || block?.per_dollar.theta_per_dollar === undefined ? "N A" : block.per_dollar.theta_per_dollar.toFixed(3)}</dd>
           </dl>
-          {rationale.notes.length > 0 ? <p className="rationale-notes">Notes: {rationale.notes.join(", ")}</p> : null}
+          {rationale.notes.length > 0 ? (
+            <div className="rationale-note-chips">
+              {rationale.notes.map((note) => (
+                <span key={note} className="rationale-note-chip">
+                  {note}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </>
       ) : (
         <p className="rationale-empty">N A</p>

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 WallType = Literal["none", "call_wall", "put_wall"]
 StaleLevel = Literal["fresh", "stale", "critical"]
+MarketRegime = Literal["pinning", "trend", "transition", "unknown"]
 
 
 class UnderlyingSpot(BaseModel):
@@ -100,6 +101,10 @@ class Summary(BaseModel):
     mtc_call_contract_id: str | None = None
     mtc_put_contract_id: str | None = None
     nearest_msi_distance_pct: float | None = None
+    market_regime: MarketRegime | None = None
+    data_quality_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    fresh_contract_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
+    stream_latency_ms: int | None = Field(default=None, ge=0)
 
 
 class Config(BaseModel):

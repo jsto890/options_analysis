@@ -5,7 +5,10 @@ import {
   formatCount,
   formatIv,
   formatIvResidualVolPoints,
+  formatLatency,
+  formatMarketRegime,
   formatOptionMid,
+  formatQualityScore,
   formatSpreadPct,
   formatSummaryPercent,
   ladderNull,
@@ -45,5 +48,14 @@ describe("formatting", () => {
   it("formats summary percentages", () => {
     expect(formatSummaryPercent(0.0075)).toBe("0.75%")
     expect(formatSummaryPercent(null)).toBe("N A")
+  })
+
+  it("formats cockpit helpers", () => {
+    expect(formatQualityScore(0.73)).toBe("73")
+    expect(formatQualityScore(null)).toBe("N A")
+    expect(formatLatency(456.3)).toBe("456 ms")
+    expect(formatLatency(null)).toBe("N A")
+    expect(formatMarketRegime("pinning")).toBe("PINNING")
+    expect(formatMarketRegime(null)).toBe("UNKNOWN")
   })
 })

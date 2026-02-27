@@ -85,6 +85,10 @@ export interface Summary {
   mtc_call_contract_id: string | null
   mtc_put_contract_id: string | null
   nearest_msi_distance_pct: number | null
+  market_regime?: "pinning" | "trend" | "transition" | "unknown" | null
+  data_quality_score?: number | null
+  fresh_contract_ratio?: number | null
+  stream_latency_ms?: number | null
 }
 
 export interface Config {

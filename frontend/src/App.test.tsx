@@ -103,6 +103,10 @@ function makeSnapshot(rows: StrikeRow[], summaryPatch: Partial<Summary> = {}): S
         mtc_call_contract_id: rows[0]?.call.contract_id ?? null,
         mtc_put_contract_id: rows[0]?.put.contract_id ?? null,
         nearest_msi_distance_pct: 0.01,
+        market_regime: "pinning",
+        data_quality_score: 0.82,
+        fresh_contract_ratio: 0.75,
+        stream_latency_ms: 350,
         ...summaryPatch
       },
       rows
@@ -259,5 +263,50 @@ describe("App controls + integrations", () => {
     fireEvent.change(seek, { target: { value: "2" } })
     expect(seek.value).toBe("2")
     expect(screen.getByText(/Frame 2\/3/)).toBeTruthy()
+  })
+
+  it("opens command palette with meta+k and runs jump action", async () => {
+    const rows = [makeRow(430), makeRow(431, { isMsi: true, wallType: "call_wall" })]
+    installFetch([makeSnapshot(rows)])
+
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector("tbody tr[data-strike='430']")).not.toBeNull())
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true })
+    expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: /Jump to nearest MSI/i }))
+    expect(container.querySelector("tbody tr.selected-row")?.getAttribute("data-strike")).toBe("431")
+  })
+
+  it("updates cockpit summary deltas without rerendering ladder rows", async () => {
+    const rows = [makeRow(430), makeRow(431, { isMsi: true, wallType: "call_wall" })]
+    const summaryOnlyDelta: DeltaEnvelope = {
+      type: "delta",
+      schema_version: 1,
+      ts_ms: 3,
+      payload: {
+        underlying_patch: {},
+        summary_patch: {
+          market_regime: "trend",
+          data_quality_score: 0.67
+        },
+        row_patches: []
+      }
+    }
+    installFetch([makeSnapshot(rows), summaryOnlyDelta])
+
+    const rowRenderSpy = vi.fn()
+    render(<App onRowRender={rowRenderSpy} />)
+
+    await waitFor(() => expect(screen.getByText("PINNING")).toBeTruthy())
+    rowRenderSpy.mockClear()
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 650))
+    })
+
+    expect(screen.getByText("TREND")).toBeTruthy()
+    expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 })

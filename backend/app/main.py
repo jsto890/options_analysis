@@ -342,6 +342,11 @@ async def _refresh_loop(app: FastAPI) -> None:
 
         # Keep fallback summary values coherent when analytics data is sparse.
         app.state.store.derive_summary_defaults()
+        _update_summary_quality(
+            snapshot,
+            server_now_ms=now_ms(),
+            subscriptions=_subscription_count(app),
+        )
         delta = app.state.store.compute_delta()
         if delta is None:
             continue
@@ -914,6 +919,67 @@ def _apply_analytics(snapshot: StateSnapshot, analytics: AnalyticsOutput, spot: 
             analytics.mtc.best_put,
             max_stale_ms=snapshot.config.max_stale_ms,
         )
+
+
+def _update_summary_quality(snapshot: StateSnapshot, *, server_now_ms: int, subscriptions: int) -> None:
+    contracts = [block for row in snapshot.rows for block in (row.call, row.put)]
+    if not contracts:
+        snapshot.summary.fresh_contract_ratio = None
+        snapshot.summary.stream_latency_ms = _spot_latency_ms(snapshot, server_now_ms)
+        snapshot.summary.data_quality_score = None
+        snapshot.summary.market_regime = "unknown"
+        return
+
+    max_stale_ms = max(1, snapshot.config.max_stale_ms)
+    fresh_count = sum(1 for block in contracts if block.stale_ms <= max_stale_ms)
+    fresh_ratio = fresh_count / len(contracts)
+    snapshot.summary.fresh_contract_ratio = fresh_ratio
+
+    contract_staleness = sorted(max(0, int(block.stale_ms)) for block in contracts)
+    median_contract_staleness = contract_staleness[len(contract_staleness) // 2]
+    spot_latency_ms = _spot_latency_ms(snapshot, server_now_ms)
+    stream_latency_ms = (
+        max(median_contract_staleness, spot_latency_ms)
+        if spot_latency_ms is not None
+        else median_contract_staleness
+    )
+    snapshot.summary.stream_latency_ms = stream_latency_ms
+
+    staleness_ratio = min(1.0, stream_latency_ms / (max_stale_ms * 3))
+    sub_ratio = min(1.0, subscriptions / max(1, snapshot.config.max_subscriptions_soft_limit))
+    quality = (fresh_ratio * 0.7) + ((1 - staleness_ratio) * 0.2) + ((1 - sub_ratio) * 0.1)
+    snapshot.summary.data_quality_score = max(0.0, min(1.0, quality))
+    snapshot.summary.market_regime = _derive_market_regime(snapshot)
+
+
+def _spot_latency_ms(snapshot: StateSnapshot, server_now_ms: int) -> int | None:
+    ts_ms = snapshot.underlying.spot.ts_ms
+    if ts_ms <= 0:
+        return None
+    return max(0, int(server_now_ms - ts_ms))
+
+
+def _derive_market_regime(snapshot: StateSnapshot) -> str:
+    summary = snapshot.summary
+    if not snapshot.rows:
+        return "unknown"
+
+    pin_risk = float(summary.pin_risk or 0.0)
+    nearest = summary.nearest_msi_distance_pct
+    net_gex = summary.net_gex_band
+
+    if nearest is not None and pin_risk >= 65 and nearest <= 0.008:
+        return "pinning"
+
+    if net_gex is not None and abs(net_gex) >= 1_000_000 and pin_risk <= 45:
+        return "trend"
+
+    if (nearest is not None and nearest <= 0.02) or (
+        net_gex is not None and abs(net_gex) >= 250_000
+    ):
+        return "transition"
+
+    return "unknown"
 
 
 def _nearest_strike(rows: list[StrikeRow], spot: float) -> float | None:

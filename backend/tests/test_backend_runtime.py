@@ -117,6 +117,11 @@ def test_websocket_sends_snapshot_on_connect(tmp_path):
             assert message["type"] == "snapshot"
             assert message["schema_version"] == 1
             assert message["payload"]["underlying"]["symbol"] == "QQQ"
+            summary = message["payload"]["summary"]
+            assert "market_regime" in summary
+            assert "data_quality_score" in summary
+            assert "fresh_contract_ratio" in summary
+            assert "stream_latency_ms" in summary
 
 
 def test_websocket_sends_heartbeat(tmp_path):
@@ -196,6 +201,10 @@ def test_refresh_loop_populates_msi_and_mtc_fields(tmp_path):
             assert analytics_delta is not None
             summary = analytics_delta["payload"]["summary_patch"]
             assert summary["msi_strikes"] == [430.0]
+            assert summary["market_regime"] in {"pinning", "trend", "transition", "unknown"}
+            assert 0.0 <= summary["data_quality_score"] <= 1.0
+            assert 0.0 <= summary["fresh_contract_ratio"] <= 1.0
+            assert summary["stream_latency_ms"] >= 0
 
             row_patches = analytics_delta["payload"]["row_patches"]
             assert row_patches

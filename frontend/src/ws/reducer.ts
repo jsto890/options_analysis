@@ -59,7 +59,11 @@ export const EMPTY_STATE: StreamState = {
     atm_strike: null,
     mtc_call_contract_id: null,
     mtc_put_contract_id: null,
-    nearest_msi_distance_pct: null
+    nearest_msi_distance_pct: null,
+    market_regime: null,
+    data_quality_score: null,
+    fresh_contract_ratio: null,
+    stream_latency_ms: null
   },
   rowsByStrike: {},
   lastHeartbeatMs: 0,

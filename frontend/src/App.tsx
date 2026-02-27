@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { MiniExposureChart } from "@/components/MiniExposureChart"
-import { MiniIvChart } from "@/components/MiniIvChart"
-import { MtcRationaleCard } from "@/components/MtcRationaleCard"
+import { CommandPalette, type CommandAction } from "@/components/CommandPalette"
+import { ContextChips } from "@/components/ContextChips"
+import { DecisionAssistPanel } from "@/components/DecisionAssistPanel"
+import { LegendPopover } from "@/components/LegendPopover"
 import { PinnedDetailDrawer } from "@/components/PinnedDetailDrawer"
+import { SignalCockpit } from "@/components/SignalCockpit"
 import { StrikeLadder } from "@/components/StrikeLadder"
 import { useStreamStore } from "@/state/store"
 import { copyContractDescriptor } from "@/utils/contracts"
-import { formatCompactSigned, formatOptionMid, formatSummaryPercent } from "@/utils/format"
 import { isCriticalStale } from "@/utils/signals"
 import { updateSeriesFromRows, type SeriesByContract } from "@/utils/timeseries"
 import { EMPTY_STATE, type StreamState } from "@/ws/reducer"
 import { StreamClient } from "@/ws/client"
 import { PlaybackClient, replayEnvelopes } from "@/ws/playback"
-import type {
-  AnyEnvelope,
-  ContractBlock,
-  StrikeRow
-} from "@/ws/types"
+import type { AnyEnvelope, ContractBlock, StrikeRow } from "@/ws/types"
 
 interface Selection {
   strike: number
@@ -32,10 +29,21 @@ interface LadderFilters {
   hideCriticalStale: boolean
 }
 
+interface ComparedContract {
+  contract_id: string
+  label: string
+  block: ContractBlock
+}
+
+export interface AppProps {
+  onRowRender?: (strike: number) => void
+}
+
 const MIN_DATA_REFRESH_MS = 50
 const DEFAULT_PRESENTATION_REFRESH_MS = 100
+const VIEW_MODE_STORAGE_KEY = "options-analysis:view-mode"
 
-export default function App(): JSX.Element {
+export default function App({ onRowRender }: AppProps = {}): JSX.Element {
   const [state, dispatch] = useStreamStore()
   const [mode, setMode] = useState<"live" | "playback">("live")
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -48,16 +56,30 @@ export default function App(): JSX.Element {
     liquidOnly: false,
     hideCriticalStale: false
   })
+  const [focusMode, setFocusMode] = useState(false)
   const [focusStrike, setFocusStrike] = useState<number | null>(null)
   const [keyboardContext, setKeyboardContext] = useState<"none" | "ladder">("none")
   const [playbackIndex, setPlaybackIndex] = useState(0)
   const [playbackTotal, setPlaybackTotal] = useState(0)
   const [playbackRunning, setPlaybackRunning] = useState(false)
   const [playbackEnvelopes, setPlaybackEnvelopes] = useState<AnyEnvelope[]>([])
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"scan" | "explain">(() => {
+    if (typeof window === "undefined") {
+      return "scan"
+    }
+    const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY)
+    return stored === "explain" ? "explain" : "scan"
+  })
+  const [comparedContractIds, setComparedContractIds] = useState<string[]>([])
 
   const copyStatusTimer = useRef<number | null>(null)
   const playbackClientRef = useRef<PlaybackClient | null>(null)
   const liveEnvelopeQueueRef = useRef<AnyEnvelope[]>([])
+
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -160,6 +182,18 @@ export default function App(): JSX.Element {
     return copy
   }, [allRowsAsc, sortOrder])
 
+  const staleCriticalRatio = useMemo(() => {
+    if (allRowsAsc.length === 0) {
+      return 0
+    }
+    const criticalRows = allRowsAsc.filter(
+      (row) => isCriticalStale(row.call, state.config) && isCriticalStale(row.put, state.config)
+    ).length
+    return criticalRows / allRowsAsc.length
+  }, [allRowsAsc, state.config])
+
+  const staleHeavy = staleCriticalRatio >= 0.45
+
   const rows = useMemo(() => {
     return allRowsSorted.filter((row) => {
       if (filters.msiOnly && !row.flags.is_msi) {
@@ -183,9 +217,30 @@ export default function App(): JSX.Element {
       ) {
         return false
       }
+      if (focusMode) {
+        const isSelected = selection?.strike === row.strike
+        const isTradableContext =
+          row.flags.is_msi ||
+          row.call.liquid ||
+          row.put.liquid ||
+          row.call.contract_id === state.summary.mtc_call_contract_id ||
+          row.put.contract_id === state.summary.mtc_put_contract_id ||
+          isSelected
+        if (!isTradableContext) {
+          return false
+        }
+      }
       return true
     })
-  }, [allRowsSorted, filters, state.summary.mtc_call_contract_id, state.summary.mtc_put_contract_id, state.config])
+  }, [
+    allRowsSorted,
+    filters,
+    focusMode,
+    selection?.strike,
+    state.summary.mtc_call_contract_id,
+    state.summary.mtc_put_contract_id,
+    state.config
+  ])
 
   useEffect(() => {
     if (allRowsAsc.length === 0) {
@@ -209,6 +264,12 @@ export default function App(): JSX.Element {
     }
   }, [selection, state.rowsByStrike])
 
+  useEffect(() => {
+    setComparedContractIds((current) =>
+      current.filter((contractId) => findContractById(allRowsAsc, contractId) !== null)
+    )
+  }, [allRowsAsc])
+
   const mtcCallBlock = useMemo(
     () => findContractById(allRowsAsc, state.summary.mtc_call_contract_id),
     [allRowsAsc, state.summary.mtc_call_contract_id]
@@ -229,6 +290,13 @@ export default function App(): JSX.Element {
 
   const selectedRow = selection ? state.rowsByStrike[selection.strike] ?? null : null
   const selectedSeries = selection?.contractId ? seriesByContract[selection.contractId] ?? [] : []
+
+  const comparedContracts = useMemo<ComparedContract[]>(() => {
+    return comparedContractIds
+      .map((contractId) => buildComparedContract(allRowsAsc, contractId))
+      .filter((contract): contract is ComparedContract => contract !== null)
+      .slice(0, 2)
+  }, [allRowsAsc, comparedContractIds])
 
   const atmStrike = useMemo(() => {
     if (state.summary.atm_strike !== undefined && state.summary.atm_strike !== null) {
@@ -377,15 +445,171 @@ export default function App(): JSX.Element {
     setKeyboardContext("ladder")
   }
 
+  const toggleCompare = (contractId: string | null) => {
+    if (!contractId) {
+      return
+    }
+    setComparedContractIds((current) => {
+      if (current.includes(contractId)) {
+        return current.filter((id) => id !== contractId)
+      }
+      return [...current, contractId].slice(-2)
+    })
+  }
+
+  const jumpSelectionByOffset = (offset: number) => {
+    if (!selection || rows.length === 0) {
+      jumpToStrike(atmStrike)
+      return
+    }
+
+    const strikes = rows.map((row) => row.strike)
+    const currentIndex = strikes.indexOf(selection.strike)
+    if (currentIndex === -1) {
+      return
+    }
+
+    const nextIndex = Math.max(0, Math.min(strikes.length - 1, currentIndex + offset))
+    if (nextIndex === currentIndex) {
+      return
+    }
+
+    const nextStrike = strikes[nextIndex]
+    const nextRow = state.rowsByStrike[nextStrike]
+    if (!nextRow) {
+      return
+    }
+
+    const nextBlock = selection.side === "call" ? nextRow.call : nextRow.put
+    setSelection({
+      strike: nextStrike,
+      side: selection.side,
+      contractId: nextBlock.contract_id
+    })
+    setFocusStrike(nextStrike)
+  }
+
+  const commandActions = useMemo<CommandAction[]>(
+    () => [
+      {
+        id: "jump-atm",
+        label: "Jump to ATM",
+        description: "Select and center the ATM strike.",
+        shortcut: "A",
+        disabled: atmStrike === null,
+        run: () => jumpToStrike(atmStrike)
+      },
+      {
+        id: "jump-msi",
+        label: "Jump to nearest MSI",
+        description: "Center the closest MSI strike to spot.",
+        shortcut: "M",
+        disabled: nearestMsiStrike === null,
+        run: () => jumpToStrike(nearestMsiStrike)
+      },
+      {
+        id: "jump-mtc-call",
+        label: "Jump to MTC call",
+        description: "Focus the current best call contract row.",
+        run: () => jumpToSelection(mtcCallSelection)
+      },
+      {
+        id: "jump-mtc-put",
+        label: "Jump to MTC put",
+        description: "Focus the current best put contract row.",
+        run: () => jumpToSelection(mtcPutSelection)
+      },
+      {
+        id: "toggle-focus",
+        label: focusMode ? "Disable guided focus" : "Enable guided focus",
+        description: "Show tradable/MSI context rows only.",
+        run: () => setFocusMode((current) => !current)
+      },
+      {
+        id: "toggle-mode",
+        label: viewMode === "scan" ? "Switch to explain mode" : "Switch to scan mode",
+        description: "Change information density in Decision Assist.",
+        run: () => setViewMode((current) => (current === "scan" ? "explain" : "scan"))
+      },
+      {
+        id: "copy-selected",
+        label: "Copy selected contract",
+        description: "Copy selected contract descriptor to clipboard.",
+        shortcut: "C",
+        disabled: !selection?.contractId,
+        run: () => {
+          void handleCopyContract(selection?.contractId ?? null)
+        }
+      },
+      {
+        id: "copy-selected-conid",
+        label: "Copy selected contract + conid",
+        description: "Copy descriptor with conid prefix.",
+        shortcut: "Shift+C",
+        disabled: !selection?.contractId,
+        run: () => {
+          void handleCopyContract(selection?.contractId ?? null, true)
+        }
+      }
+    ],
+    [
+      atmStrike,
+      focusMode,
+      mtcCallSelection,
+      mtcPutSelection,
+      nearestMsiStrike,
+      selection?.contractId,
+      viewMode
+    ]
+  )
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setCommandPaletteOpen(true)
+        return
+      }
+
+      if (commandPaletteOpen) {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          setCommandPaletteOpen(false)
+        }
+        return
+      }
+
       if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "RANGE"].includes(target.tagName)) {
         return
       }
 
       if (event.key === "Escape") {
         setSelection(null)
+        return
+      }
+
+      if (event.key === "a" || event.key === "A") {
+        event.preventDefault()
+        jumpToStrike(atmStrike)
+        return
+      }
+
+      if (event.key === "m" || event.key === "M") {
+        event.preventDefault()
+        jumpToStrike(nearestMsiStrike)
+        return
+      }
+
+      if (event.key === "[") {
+        event.preventDefault()
+        jumpSelectionByOffset(-1)
+        return
+      }
+
+      if (event.key === "]") {
+        event.preventDefault()
+        jumpSelectionByOffset(1)
         return
       }
 
@@ -458,20 +682,51 @@ export default function App(): JSX.Element {
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [keyboardContext, rows, selection, state.rowsByStrike])
+  }, [
+    atmStrike,
+    commandPaletteOpen,
+    keyboardContext,
+    nearestMsiStrike,
+    rows,
+    selection,
+    state.rowsByStrike
+  ])
+
+  const statusMessages = useMemo(() => {
+    const messages: string[] = []
+    if (!state.connected) {
+      messages.push("Live stream disconnected. Data may be stale until reconnect.")
+    }
+    if (mode === "live" && state.subscriptions === 0) {
+      messages.push("No active option subscriptions. Verify TWS market data and line budget.")
+    }
+    if (staleHeavy) {
+      messages.push("Critical staleness is elevated. Prefer contracts with fresh quotes only.")
+    }
+    return messages
+  }, [mode, staleHeavy, state.connected, state.subscriptions])
 
   return (
-    <main className="app-shell">
-      <header className="top-bar">
-        <div>
-          <strong>{state.symbol || "QQQ"}</strong>
-          <span className={`status ${state.connected ? "ok" : "down"}`}>{state.connected ? "CONNECTED" : "DISCONNECTED"}</span>
-        </div>
-        <div>Expiry: {state.expiry || "N A"}</div>
-        <div>Spot: {formatOptionMid(state.spot.mid)}</div>
-        <div>Mode: {mode.toUpperCase()}</div>
-        <div>Subs: {state.subscriptions}</div>
-      </header>
+    <main className="app-shell premium-shell">
+      <SignalCockpit
+        symbol={state.symbol}
+        expiry={state.expiry}
+        connected={state.connected}
+        subscriptions={state.subscriptions}
+        mode={mode}
+        spotMid={state.spot.mid}
+        pinRisk={state.summary.pin_risk}
+        netGexBand={state.summary.net_gex_band}
+        nearestMsiDistancePct={state.summary.nearest_msi_distance_pct}
+        marketRegime={state.summary.market_regime}
+        dataQualityScore={state.summary.data_quality_score}
+        freshContractRatio={state.summary.fresh_contract_ratio}
+        streamLatencyMs={state.summary.stream_latency_ms}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode((current) => (current === "scan" ? "explain" : "scan"))}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      />
+
       {mode === "playback" ? (
         <div className="playback-strip">
           <button type="button" className="control-btn" onClick={togglePlayback}>
@@ -496,7 +751,27 @@ export default function App(): JSX.Element {
           </span>
         </div>
       ) : null}
+
+      {statusMessages.length > 0 ? (
+        <div className="status-banner" role="status" aria-live="polite">
+          {statusMessages.map((message) => (
+            <p key={message}>{message}</p>
+          ))}
+        </div>
+      ) : null}
+
+      <ContextChips
+        filters={filters}
+        selection={selection ? { strike: selection.strike, side: selection.side } : null}
+        focusMode={focusMode}
+        staleHeavy={staleHeavy}
+        noSubscriptions={mode === "live" && state.subscriptions === 0}
+        connected={state.connected}
+        viewMode={viewMode}
+      />
+
       {copyStatus ? <div className="copy-toast">{copyStatus}</div> : null}
+
       <section className="content-grid">
         <div className="left-panel">
           <h3>Config</h3>
@@ -517,7 +792,15 @@ export default function App(): JSX.Element {
               >
                 Sort: {sortOrder.toUpperCase()}
               </button>
+              <button
+                type="button"
+                onClick={() => setFocusMode((current) => !current)}
+                className="control-btn"
+              >
+                Focus: {focusMode ? "ON" : "OFF"}
+              </button>
               <span className="ladder-count">Rows: {rows.length}</span>
+              <LegendPopover />
             </div>
             <div className="ladder-controls-group">
               <label>
@@ -600,66 +883,33 @@ export default function App(): JSX.Element {
             onCopyMtcContract={(contractId) => {
               void handleCopyContract(contractId)
             }}
+            onRowRender={onRowRender}
           />
         </div>
-        <div className="right-panel">
-          <h3>Summary</h3>
-          <p>Pin Risk: {Math.round(state.summary.pin_risk)}</p>
-          <p>ATM: {state.summary.atm_strike ?? "N A"}</p>
-          <p>MSI: {state.summary.msi_strikes.join(", ") || "N A"}</p>
-          <p>Net GEX: {formatCompactSigned(state.summary.net_gex_band)}</p>
-          <p>Nearest MSI: {formatSummaryPercent(state.summary.nearest_msi_distance_pct)}</p>
 
-          <MiniIvChart
-            rows={allRowsAsc}
-            selectedStrike={selection?.strike ?? null}
-            onSelectStrike={(strike) => jumpToStrike(strike)}
-          />
-          <MiniExposureChart
-            rows={allRowsAsc}
-            selectedStrike={selection?.strike ?? null}
-            onSelectStrike={(strike) => jumpToStrike(strike)}
-          />
-
-          <div className="msi-card">
-            <h4>Top MSI</h4>
-            {msiRows.length === 0 ? (
-              <p className="rationale-empty">N A</p>
-            ) : (
-              <ul className="msi-list">
-                {msiRows.map((row) => (
-                  <li key={row.strike}>
-                    <button
-                      type="button"
-                      className="msi-item-btn"
-                      onClick={() => jumpToStrike(row.strike)}
-                    >
-                      {row.strike} | {row.flags.wall_type} | {row.msi_score === null ? "N A" : row.msi_score.toFixed(2)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <MtcRationaleCard
-            side="Call"
-            block={mtcCallBlock}
-            onSelectContract={(contractId) => jumpToSelection(findSelectionByContract(allRowsAsc, contractId))}
-            onCopyContract={(contractId, includeConid) => {
-              void handleCopyContract(contractId, includeConid)
-            }}
-          />
-          <MtcRationaleCard
-            side="Put"
-            block={mtcPutBlock}
-            onSelectContract={(contractId) => jumpToSelection(findSelectionByContract(allRowsAsc, contractId))}
-            onCopyContract={(contractId, includeConid) => {
-              void handleCopyContract(contractId, includeConid)
-            }}
-          />
-        </div>
+        <DecisionAssistPanel
+          rows={allRowsAsc}
+          selectedStrike={selection?.strike ?? null}
+          onSelectStrike={(strike) => jumpToStrike(strike)}
+          msiRows={msiRows}
+          mtcCallBlock={mtcCallBlock}
+          mtcPutBlock={mtcPutBlock}
+          nearestMsiDistancePct={state.summary.nearest_msi_distance_pct}
+          netGexBand={state.summary.net_gex_band}
+          viewMode={viewMode}
+          comparedContracts={comparedContracts}
+          onRemoveComparedContract={(contractId) =>
+            setComparedContractIds((current) => current.filter((id) => id !== contractId))
+          }
+          onToggleCompare={toggleCompare}
+          onJumpToStrike={(strike) => jumpToStrike(strike)}
+          onSelectContract={(contractId) => jumpToSelection(findSelectionByContract(allRowsAsc, contractId))}
+          onCopyContract={(contractId, includeConid) => {
+            void handleCopyContract(contractId, includeConid)
+          }}
+        />
       </section>
+
       <PinnedDetailDrawer
         symbol={state.symbol}
         expiry={state.expiry}
@@ -673,8 +923,30 @@ export default function App(): JSX.Element {
           void handleCopyContract(selection?.contractId ?? null, includeConid)
         }}
       />
+
+      <CommandPalette open={commandPaletteOpen} actions={commandActions} onClose={() => setCommandPaletteOpen(false)} />
     </main>
   )
+}
+
+function buildComparedContract(rows: StrikeRow[], contractId: string): ComparedContract | null {
+  for (const row of rows) {
+    if (row.call.contract_id === contractId) {
+      return {
+        contract_id: contractId,
+        label: `CALL ${row.strike}`,
+        block: row.call
+      }
+    }
+    if (row.put.contract_id === contractId) {
+      return {
+        contract_id: contractId,
+        label: `PUT ${row.strike}`,
+        block: row.put
+      }
+    }
+  }
+  return null
 }
 
 function findContractById(rows: StrikeRow[], contractId: string | null): ContractBlock | null {
