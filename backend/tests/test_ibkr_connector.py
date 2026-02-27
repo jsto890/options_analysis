@@ -12,16 +12,29 @@ from app.ibkr.connector import IBKRConnector, ReadOnlyViolation
 
 
 class FakeIB:
-    def __init__(self, *, in_use_ids: set[int] | None = None, cancelled_ids: set[int] | None = None):
+    def __init__(
+        self,
+        *,
+        in_use_ids: set[int] | None = None,
+        cancelled_ids: set[int] | None = None,
+        refused_ports: set[int] | None = None,
+    ):
         self._connected = False
         self.in_use_ids = in_use_ids or set()
         self.cancelled_ids = cancelled_ids or set()
+        self.refused_ports = refused_ports or set()
         self.attempted_client_ids: list[int] = []
+        self.attempted_ports: list[int] = []
+        self.attempted_pairs: list[tuple[int, int]] = []
         self.market_data_type_calls: list[int] = []
 
     async def connectAsync(self, host: str, port: int, clientId: int, timeout: int) -> None:
         _ = (host, port, timeout)
         self.attempted_client_ids.append(clientId)
+        self.attempted_ports.append(port)
+        self.attempted_pairs.append((port, clientId))
+        if port in self.refused_ports:
+            raise ConnectionRefusedError("Connect call failed")
         if clientId in self.cancelled_ids:
             raise asyncio.CancelledError("Error 326, reqId -1: Unable to connect as the client id is already in use.")
         if clientId in self.in_use_ids:
@@ -97,6 +110,7 @@ def test_connector_retries_with_next_client_id_when_configured_id_is_in_use():
     connector = IBKRConnector(IBKRConfig(read_only=False, client_id=19))
     fake_ib = FakeIB(in_use_ids={19})
     connector.ib = fake_ib  # type: ignore[assignment]
+    connector._reset_ib_client = lambda: None  # type: ignore[method-assign]
 
     connected = asyncio.run(connector.connect(paper=False))
 
@@ -110,20 +124,58 @@ def test_connector_stops_retrying_after_ten_in_use_client_ids():
     connector = IBKRConnector(IBKRConfig(read_only=False, client_id=19))
     fake_ib = FakeIB(in_use_ids={19, 20, 21, 22, 23, 24, 25, 26, 27, 28})
     connector.ib = fake_ib  # type: ignore[assignment]
+    connector._reset_ib_client = lambda: None  # type: ignore[method-assign]
 
     connected = asyncio.run(connector.connect(paper=False))
 
     assert connected is False
-    assert fake_ib.attempted_client_ids == [19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+    assert fake_ib.attempted_pairs == [
+        (4001, 19),
+        (4001, 20),
+        (4001, 21),
+        (4001, 22),
+        (4001, 23),
+        (4001, 24),
+        (4001, 25),
+        (4001, 26),
+        (4001, 27),
+        (4001, 28),
+        (7496, 19),
+        (7496, 20),
+        (7496, 21),
+        (7496, 22),
+        (7496, 23),
+        (7496, 24),
+        (7496, 25),
+        (7496, 26),
+        (7496, 27),
+        (7496, 28),
+    ]
 
 
 def test_connector_retries_when_connect_raises_cancelled_error_for_in_use_client_id():
     connector = IBKRConnector(IBKRConfig(read_only=False, client_id=19))
     fake_ib = FakeIB(cancelled_ids={19})
     connector.ib = fake_ib  # type: ignore[assignment]
+    connector._reset_ib_client = lambda: None  # type: ignore[method-assign]
 
     connected = asyncio.run(connector.connect(paper=False))
 
     assert connected is True
     assert connector.active_client_id == 20
     assert fake_ib.attempted_client_ids == [19, 20]
+
+
+def test_connector_falls_back_to_tws_live_port_when_gateway_live_port_is_refused():
+    connector = IBKRConnector(
+        IBKRConfig(read_only=False, client_id=19, host="127.0.0.1", live_port=4001, paper_port=4002)
+    )
+    fake_ib = FakeIB(refused_ports={4001})
+    connector.ib = fake_ib  # type: ignore[assignment]
+    connector._reset_ib_client = lambda: None  # type: ignore[method-assign]
+
+    connected = asyncio.run(connector.connect(paper=False))
+
+    assert connected is True
+    assert fake_ib.attempted_pairs[0] == (4001, 19)
+    assert fake_ib.attempted_pairs[1] == (7496, 19)

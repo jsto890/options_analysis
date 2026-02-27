@@ -16,8 +16,6 @@ import { PlaybackClient, replayEnvelopes } from "@/ws/playback"
 import type {
   AnyEnvelope,
   ContractBlock,
-  DesktopSettings,
-  DesktopSettingsApplyResponse,
   StrikeRow
 } from "@/ws/types"
 
@@ -35,12 +33,7 @@ interface LadderFilters {
 }
 
 const MIN_DATA_REFRESH_MS = 50
-const MAX_DATA_REFRESH_MS = 5000
-const MIN_PRESENTATION_REFRESH_MS = 16
-const MAX_PRESENTATION_REFRESH_MS = 2000
 const DEFAULT_PRESENTATION_REFRESH_MS = 100
-const MIN_CLIENT_ID = 0
-const MAX_CLIENT_ID = 2_147_483_647
 
 export default function App(): JSX.Element {
   const [state, dispatch] = useStreamStore()
@@ -61,56 +54,10 @@ export default function App(): JSX.Element {
   const [playbackTotal, setPlaybackTotal] = useState(0)
   const [playbackRunning, setPlaybackRunning] = useState(false)
   const [playbackEnvelopes, setPlaybackEnvelopes] = useState<AnyEnvelope[]>([])
-  const [dataRefreshDraft, setDataRefreshDraft] = useState<string>(String(state.config.update_interval_ms))
-  const [presentationRefreshMs, setPresentationRefreshMs] = useState<number>(DEFAULT_PRESENTATION_REFRESH_MS)
-  const [presentationRefreshDraft, setPresentationRefreshDraft] = useState<string>(
-    String(DEFAULT_PRESENTATION_REFRESH_MS)
-  )
-  const [desktopSettingsDraft, setDesktopSettingsDraft] = useState<DesktopSettings | null>(null)
-  const [desktopSettingsLoading, setDesktopSettingsLoading] = useState<boolean>(true)
-  const [desktopSettingsError, setDesktopSettingsError] = useState<string>("")
-  const [desktopRestartRequired, setDesktopRestartRequired] = useState<boolean>(false)
 
   const copyStatusTimer = useRef<number | null>(null)
   const playbackClientRef = useRef<PlaybackClient | null>(null)
   const liveEnvelopeQueueRef = useRef<AnyEnvelope[]>([])
-
-  useEffect(() => {
-    setDataRefreshDraft(String(state.config.update_interval_ms))
-  }, [state.config.update_interval_ms])
-
-  useEffect(() => {
-    let cancelled = false
-    setDesktopSettingsLoading(true)
-    setDesktopSettingsError("")
-
-    void (async () => {
-      try {
-        const response = await fetch(apiPath("/desktop/settings"))
-        if (!response.ok) {
-          throw new Error(`desktop settings status ${response.status}`)
-        }
-        const payload = (await response.json()) as DesktopSettings
-        if (cancelled) {
-          return
-        }
-        setDesktopSettingsDraft(payload)
-      } catch {
-        if (cancelled) {
-          return
-        }
-        setDesktopSettingsError("Desktop settings unavailable")
-      } finally {
-        if (!cancelled) {
-          setDesktopSettingsLoading(false)
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -123,10 +70,10 @@ export default function App(): JSX.Element {
       for (const envelope of batch) {
         dispatch(envelope)
       }
-    }, presentationRefreshMs)
+    }, DEFAULT_PRESENTATION_REFRESH_MS)
 
     return () => window.clearInterval(timer)
-  }, [dispatch, presentationRefreshMs])
+  }, [dispatch])
 
   useEffect(() => {
     let mounted = true
@@ -391,95 +338,6 @@ export default function App(): JSX.Element {
     }
   }
 
-  const applyPresentationRefresh = () => {
-    const parsed = clampMs(
-      Number.parseInt(presentationRefreshDraft, 10),
-      MIN_PRESENTATION_REFRESH_MS,
-      MAX_PRESENTATION_REFRESH_MS,
-      DEFAULT_PRESENTATION_REFRESH_MS
-    )
-    setPresentationRefreshMs(parsed)
-    setPresentationRefreshDraft(String(parsed))
-    publishCopyStatus(`UI refresh ${parsed} ms`)
-  }
-
-  const applyDataRefresh = async () => {
-    const parsed = clampMs(
-      Number.parseInt(dataRefreshDraft, 10),
-      MIN_DATA_REFRESH_MS,
-      MAX_DATA_REFRESH_MS,
-      Math.max(MIN_DATA_REFRESH_MS, state.config.update_interval_ms)
-    )
-    setDataRefreshDraft(String(parsed))
-
-    try {
-      const response = await fetch(apiPath("/config"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          update_interval_ms: parsed
-        })
-      })
-
-      if (!response.ok) {
-        publishCopyStatus("Data refresh update failed")
-        return
-      }
-
-      publishCopyStatus(`Data refresh ${parsed} ms`)
-    } catch {
-      publishCopyStatus("Data refresh update failed")
-    }
-  }
-
-  const updateDesktopDraft = (patch: Partial<DesktopSettings>) => {
-    setDesktopSettingsDraft((current) => {
-      if (!current) {
-        return current
-      }
-      return { ...current, ...patch }
-    })
-  }
-
-  const saveDesktopSettings = async () => {
-    if (!desktopSettingsDraft) {
-      return
-    }
-
-    const payload: DesktopSettings = {
-      connect_paper: desktopSettingsDraft.connect_paper,
-      client_id: clampMs(desktopSettingsDraft.client_id, MIN_CLIENT_ID, MAX_CLIENT_ID, 19),
-      host: (desktopSettingsDraft.host || "127.0.0.1").trim() || "127.0.0.1",
-      paper_port: clampMs(desktopSettingsDraft.paper_port, 1, 65535, 4002),
-      live_port: clampMs(desktopSettingsDraft.live_port, 1, 65535, 4001)
-    }
-    setDesktopSettingsDraft(payload)
-
-    try {
-      const response = await fetch(apiPath("/desktop/settings"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        publishCopyStatus("Desktop settings save failed")
-        return
-      }
-
-      const result = (await response.json()) as DesktopSettingsApplyResponse
-      setDesktopSettingsDraft(result.settings)
-      setDesktopRestartRequired(result.restart_required)
-      publishCopyStatus(result.restart_required ? "Desktop settings saved (restart required)" : "Desktop settings saved")
-    } catch {
-      publishCopyStatus("Desktop settings save failed")
-    }
-  }
-
   const selectStrike = (strike: number) => {
     const row = state.rowsByStrike[strike]
     if (!row) {
@@ -647,108 +505,6 @@ export default function App(): JSX.Element {
           <p>Max stale: {state.config.max_stale_ms} ms</p>
           <p>Max spread: {(state.config.max_spread_pct * 100).toFixed(1)}%</p>
           <p>IV imbalance: {(state.config.iv_imbalance_threshold * 100).toFixed(2)} vol pts</p>
-          <div className="refresh-controls">
-            <label htmlFor="data-refresh-ms">Data refresh (ms)</label>
-            <input
-              id="data-refresh-ms"
-              type="number"
-              min={MIN_DATA_REFRESH_MS}
-              max={MAX_DATA_REFRESH_MS}
-              step={1}
-              value={dataRefreshDraft}
-              onChange={(event) => setDataRefreshDraft(event.target.value)}
-            />
-            <button type="button" className="control-btn" onClick={() => void applyDataRefresh()}>
-              Apply Data
-            </button>
-            <label htmlFor="presentation-refresh-ms">UI refresh (ms)</label>
-            <input
-              id="presentation-refresh-ms"
-              type="number"
-              min={MIN_PRESENTATION_REFRESH_MS}
-              max={MAX_PRESENTATION_REFRESH_MS}
-              step={1}
-              value={presentationRefreshDraft}
-              onChange={(event) => setPresentationRefreshDraft(event.target.value)}
-            />
-            <button type="button" className="control-btn" onClick={applyPresentationRefresh}>
-              Apply UI
-            </button>
-          </div>
-          <div className="desktop-settings">
-            <h4>Desktop</h4>
-            {desktopSettingsLoading ? <p>Loading desktop settings...</p> : null}
-            {!desktopSettingsLoading && desktopSettingsError ? <p>{desktopSettingsError}</p> : null}
-            {!desktopSettingsLoading && !desktopSettingsError && desktopSettingsDraft ? (
-              <>
-                <label className="desktop-mode-toggle">
-                  <input
-                    type="checkbox"
-                    checked={desktopSettingsDraft.connect_paper}
-                    onChange={(event) => {
-                      updateDesktopDraft({ connect_paper: event.target.checked })
-                      setDesktopRestartRequired(false)
-                    }}
-                  />
-                  Paper mode
-                </label>
-                <label htmlFor="desktop-client-id">Client ID</label>
-                <input
-                  id="desktop-client-id"
-                  type="number"
-                  min={MIN_CLIENT_ID}
-                  max={MAX_CLIENT_ID}
-                  step={1}
-                  value={desktopSettingsDraft.client_id}
-                  onChange={(event) =>
-                    updateDesktopDraft({
-                      client_id: clampMs(Number.parseInt(event.target.value, 10), MIN_CLIENT_ID, MAX_CLIENT_ID, 19)
-                    })
-                  }
-                />
-                <details>
-                  <summary>Advanced host/ports</summary>
-                  <label htmlFor="desktop-host">Host</label>
-                  <input
-                    id="desktop-host"
-                    type="text"
-                    value={desktopSettingsDraft.host}
-                    onChange={(event) => updateDesktopDraft({ host: event.target.value })}
-                  />
-                  <label htmlFor="desktop-paper-port">Paper port</label>
-                  <input
-                    id="desktop-paper-port"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    step={1}
-                    value={desktopSettingsDraft.paper_port}
-                    onChange={(event) =>
-                      updateDesktopDraft({ paper_port: clampMs(Number.parseInt(event.target.value, 10), 1, 65535, 4002) })
-                    }
-                  />
-                  <label htmlFor="desktop-live-port">Live port</label>
-                  <input
-                    id="desktop-live-port"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    step={1}
-                    value={desktopSettingsDraft.live_port}
-                    onChange={(event) =>
-                      updateDesktopDraft({ live_port: clampMs(Number.parseInt(event.target.value, 10), 1, 65535, 4001) })
-                    }
-                  />
-                </details>
-                <button type="button" className="control-btn" onClick={() => void saveDesktopSettings()}>
-                  Save Desktop Settings
-                </button>
-                {desktopRestartRequired ? (
-                  <p className="desktop-restart-banner">Restart app to apply IBKR connection changes.</p>
-                ) : null}
-              </>
-            ) : null}
-          </div>
           <p>Status: {state.connected ? "Streaming" : "Awaiting"}</p>
         </div>
         <div className="center-panel">
@@ -982,18 +738,7 @@ function streamStateToSnapshotEnvelope(state: StreamState): AnyEnvelope {
   }
 }
 
-function apiPath(path: string): string {
-  return path
-}
-
 function streamPath(): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
   return `${protocol}//${window.location.host}/stream`
-}
-
-function clampMs(value: number, min: number, max: number, fallback: number): number {
-  if (!Number.isFinite(value)) {
-    return fallback
-  }
-  return Math.max(min, Math.min(max, Math.floor(value)))
 }

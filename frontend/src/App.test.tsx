@@ -124,45 +124,10 @@ function makeDelta(row: StrikeRow): DeltaEnvelope {
 }
 
 function installFetch(envelopes: AnyEnvelope[]) {
-  const desktopSettings = {
-    connect_paper: false,
-    client_id: 19,
-    host: "127.0.0.1",
-    paper_port: 4002,
-    live_port: 4001
-  }
-
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.includes("playback.json")) {
       return new Response(JSON.stringify(envelopes), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      })
-    }
-
-    if (url.endsWith("/desktop/settings") || url === "/desktop/settings") {
-      if ((init?.method ?? "GET").toUpperCase() === "POST") {
-        return new Response(
-          JSON.stringify({
-            settings: JSON.parse(String(init?.body ?? "{}")),
-            restart_required: true
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          }
-        )
-      }
-
-      return new Response(JSON.stringify(desktopSettings), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      })
-    }
-
-    if (url.endsWith("/config") || url === "/config") {
-      return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       })
@@ -195,9 +160,9 @@ afterEach(() => {
 })
 
 describe("App controls + integrations", () => {
-  it("keeps control-strip filter state across stream updates and uses same-origin config + desktop settings save", async () => {
+  it("keeps control-strip filter state across stream updates", async () => {
     const rows = [makeRow(430), makeRow(431, { isMsi: true, wallType: "call_wall" })]
-    const fetchMock = installFetch([makeSnapshot(rows), makeDelta(rows[1])])
+    installFetch([makeSnapshot(rows), makeDelta(rows[1])])
 
     const { container } = render(<App />)
 
@@ -218,35 +183,10 @@ describe("App controls + integrations", () => {
     })
     expect((msiOnly as HTMLInputElement).checked).toBe(true)
     expect(container.querySelectorAll("tbody tr").length).toBe(1)
-
-    const dataRefreshInput = screen.getByLabelText("Data refresh (ms)")
-    fireEvent.change(dataRefreshInput, { target: { value: "250" } })
-    fireEvent.click(screen.getByRole("button", { name: "Apply Data" }))
-
-    await waitFor(() => {
-      const configCalls = fetchMock.mock.calls.filter((call) => String(call[0]) === "/config")
-      expect(configCalls.length).toBe(1)
-      expect(String(configCalls[0][1]?.body)).toContain("250")
-    })
-
-    const uiRefreshInput = screen.getByLabelText("UI refresh (ms)")
-    fireEvent.change(uiRefreshInput, { target: { value: "80" } })
-    fireEvent.click(screen.getByRole("button", { name: "Apply UI" }))
-    expect(screen.getByText("UI refresh 80 ms")).toBeTruthy()
-
-    await waitFor(() => expect(screen.getByLabelText("Paper mode")).toBeTruthy())
-    fireEvent.click(screen.getByLabelText("Paper mode"))
-    fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "55" } })
-    fireEvent.click(screen.getByRole("button", { name: "Save Desktop Settings" }))
-
-    await waitFor(() => {
-      const settingsCalls = fetchMock.mock.calls.filter((call) => String(call[0]) === "/desktop/settings")
-      const postCalls = settingsCalls.filter((call) => String(call[1]?.method ?? "GET").toUpperCase() === "POST")
-      expect(postCalls.length).toBe(1)
-      expect(String(postCalls[0][1]?.body)).toContain("\"client_id\":55")
-      expect(String(postCalls[0][1]?.body)).toContain("\"connect_paper\":true")
-    })
-    expect(screen.getByText("Restart app to apply IBKR connection changes.")).toBeTruthy()
+    expect(screen.queryByLabelText("Data refresh (ms)")).toBeNull()
+    expect(screen.queryByLabelText("UI refresh (ms)")).toBeNull()
+    expect(screen.queryByLabelText("Paper mode")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Save Desktop Settings" })).toBeNull()
   })
 
   it("supports keyboard shortcuts Arrow/Enter/c/Shift+c/Esc", async () => {
