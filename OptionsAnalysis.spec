@@ -32,6 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['/Users/josephstorey/OptionsAnalysis/desktop/assets/OptionsAnalysis.icns'],
 )
 coll = COLLECT(
     exe,
@@ -45,6 +46,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='OptionsAnalysis.app',
-    icon=None,
+    icon='/Users/josephstorey/OptionsAnalysis/desktop/assets/OptionsAnalysis.icns',
     bundle_identifier='com.optionsanalysis.local',
 )
