@@ -75,6 +75,23 @@ desktop/     Native launcher and packaging scripts
 documents/   Specs, contracts, runbooks, planning artifacts
 ```
 
+## AI Agents
+
+This project uses a multi-agent delivery model with clear ownership by surface area.
+
+| Agent | Role | Rules |
+|---|---|---|
+| Product Manager Agent | Coordinates Agents and merge order, acceptance criteria, and cross-agent contract alignment. | Enforce source-of-truth from `documents/SPEC.md`, require evidence-backed check-ins, and block merges with unresolved contract drift. |
+| Subagent A (Backend/Data) | Owns backend runtime, IBKR connectivity, websocket contracts, and config/runtime behavior. | Keep API/schema contracts stable, enforce localhost-first operation, and validate backend changes with `pytest`. |
+| Subagent B (Analytics) | Owns pure analytics logic (IV surface, exposures, MSI/MTC scoring) and deterministic analytics tests. | Keep analytics deterministic, respect liquidity/delta gates, and avoid side-effect-heavy logic in core calculations. |
+| Subagent C (Frontend/UI) | Owns React UI, reducer behavior, playback parity, and rendering performance/stability. | Preserve stable ladder rendering, maintain snapshot/delta/heartbeat reducer parity, and cover UI behavior with tests. |
+
+Shared operating rules:
+- Work in scoped branches with focused, reviewable changes.
+- Respect owned-file boundaries unless coordination is explicit.
+- Run relevant tests before merge and include validation evidence.
+- Keep privacy/security constraints intact: no order placement/account surfaces, no secret commits, localhost-first defaults.
+
 ## Key Documentation
 
 - [Product spec](documents/SPEC.md)
