@@ -3,27 +3,27 @@
 _Last updated: 2026-02-26 (local)_
 
 ## Canonical References
-- SPEC: /Users/josephstorey/OptionsAnalysis/SPEC.md
-- Planning baseline: /Users/josephstorey/OptionsAnalysis/PROJECT_PLAN.md
-- Kickoff contract: /Users/josephstorey/OptionsAnalysis/Kickoff_Plan.md
-- Timeline handoff: /Users/josephstorey/OptionsAnalysis/Timeline.md
+- SPEC: <repo-root>/SPEC.md
+- Planning baseline: <repo-root>/PROJECT_PLAN.md
+- Kickoff contract: <repo-root>/Kickoff_Plan.md
+- Timeline handoff: <repo-root>/Timeline.md
 
 ## Subagent A (Backend/Data) - Branch lineage `codex/subagent-a-kickoff-data-plane`
 
 ### Completed 100%
-- FastAPI route skeleton + websocket scaffolding (`/health`, `/state`, `/config`, `/stream`) in `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`.
-- Runtime store delta pipeline with cached baselines + forced snapshot baseline sync in `/Users/josephstorey/OptionsAnalysis/backend/app/state/store.py`.
-- IBKR connector hardening in `/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/connector.py`:
+- FastAPI route skeleton + websocket scaffolding (`/health`, `/state`, `/config`, `/stream`) in `<repo-root>/backend/app/main.py`.
+- Runtime store delta pipeline with cached baselines + forced snapshot baseline sync in `<repo-root>/backend/app/state/store.py`.
+- IBKR connector hardening in `<repo-root>/backend/app/ibkr/connector.py`:
   - loop-binding safety for async calls
   - contract qualification helpers
   - market data cancel helper
   - connect warning recovery when socket is already active
-- Live data-plane ingestion and strike-window runtime wiring in `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`:
+- Live data-plane ingestion and strike-window runtime wiring in `<repo-root>/backend/app/main.py`:
   - bootstrap from underlying + option chain
   - active window subscription setup
   - refresh ingestion from tickers
   - paced window roll execution with force-snapshot contract on window changes
-- Live smoke script flow validated in `/Users/josephstorey/OptionsAnalysis/backend/scripts/ibkr_smoke.py`.
+- Live smoke script flow validated in `<repo-root>/backend/scripts/ibkr_smoke.py`.
 - Validation evidence:
   - `PYTHONPATH=backend pytest -q backend` -> `22 passed, 1 skipped`
   - `IBKR_CLIENT_ID=29 PYTHONPATH=backend python backend/scripts/ibkr_smoke.py --symbol QQQ --with-option --live` -> connect + stock stream + option stream OK
@@ -40,10 +40,10 @@ _Last updated: 2026-02-26 (local)_
 
 ### Completed 100%
 - Pure analytics modules are implemented and integrated:
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/iv_surface.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/exposures.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/msi_mtc.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/engine.py`
+  - `<repo-root>/backend/app/analytics/iv_surface.py`
+  - `<repo-root>/backend/app/analytics/exposures.py`
+  - `<repo-root>/backend/app/analytics/msi_mtc.py`
+  - `<repo-root>/backend/app/analytics/engine.py`
 - Deterministic contracts for IV fit, exposure outputs, MSI stability, MTC hard-gates, and rationale payloads are in place.
 - Runtime integration into refresh loop is active on `main` and validated by backend runtime tests.
 
@@ -62,13 +62,13 @@ _Last updated: 2026-02-26 (local)_
   - compact IV curve and exposure charts in right panel
   - MSI top-list card with wall-type context
 - Added deterministic copy actions for contract descriptor + conid descriptor:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/contracts.ts`
+  - `<repo-root>/frontend/src/utils/contracts.ts`
 - Added rolling frontend timeseries cache for pinned drawer:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/timeseries.ts`
+  - `<repo-root>/frontend/src/utils/timeseries.ts`
 - Added keyboard handling for pinned navigation (`ArrowUp/ArrowDown`) and drawer close (`Escape`).
 - Added playback parity fixture captured from live backend stream:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/fixtures/live_session.sample.json`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/live_playback_parity.test.ts`
+  - `<repo-root>/frontend/src/ws/fixtures/live_session.sample.json`
+  - `<repo-root>/frontend/src/ws/live_playback_parity.test.ts`
 - Validation evidence:
   - `npm --prefix frontend test -- --run` -> `6 files passed, 14 tests`
   - `npm --prefix frontend run build` -> success

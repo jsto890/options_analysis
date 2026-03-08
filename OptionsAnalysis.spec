@@ -1,11 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
 
 a = Analysis(
-    ['/Users/josephstorey/OptionsAnalysis/desktop/main.py'],
-    pathex=['/Users/josephstorey/OptionsAnalysis/backend', '/Users/josephstorey/OptionsAnalysis/desktop'],
+    [str(ROOT / "desktop" / "main.py")],
+    pathex=[str(ROOT / "backend"), str(ROOT / "desktop")],
     binaries=[],
-    datas=[('/Users/josephstorey/OptionsAnalysis/frontend/dist', 'frontend/dist'), ('/Users/josephstorey/OptionsAnalysis/documents/config.default.json', 'documents')],
+    datas=[
+        (str(ROOT / "frontend" / "dist"), "frontend/dist"),
+        (str(ROOT / "documents" / "config.default.json"), "documents"),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -32,7 +38,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['/Users/josephstorey/OptionsAnalysis/desktop/assets/OptionsAnalysis.icns'],
+    icon=[str(ROOT / "desktop" / "assets" / "OptionsAnalysis.icns")],
 )
 coll = COLLECT(
     exe,
@@ -46,6 +52,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='OptionsAnalysis.app',
-    icon='/Users/josephstorey/OptionsAnalysis/desktop/assets/OptionsAnalysis.icns',
+    icon=str(ROOT / "desktop" / "assets" / "OptionsAnalysis.icns"),
     bundle_identifier='com.optionsanalysis.local',
 )

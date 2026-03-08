@@ -1,9 +1,9 @@
 # Kickoff Plan Rework (SPEC-Led, Sub-Agent Optimized)
 
 ## Brief Summary
-1. Canonical source is [SPEC.md](/Users/josephstorey/OptionsAnalysis/SPEC.md); [PROJECT_PLAN.md](/Users/josephstorey/OptionsAnalysis/PROJECT_PLAN.md) remains high-level context.
+1. Canonical source is [SPEC.md](<repo-root>/SPEC.md); [PROJECT_PLAN.md](<repo-root>/PROJECT_PLAN.md) remains high-level context.
 2. Kickoff will use three sub-agent PRs (A/B/C), each with one branch, one commit, one draft PR, and explicit ownership to reduce merge conflicts.
-3. File creation is deferred until explicit go; target file is `/Users/josephstorey/OptionsAnalysis/Kickoff_Plan.md`.
+3. File creation is deferred until explicit go; target file is `<repo-root>/Kickoff_Plan.md`.
 
 ## Locked Decisions
 1. Source-of-truth precedence: `SPEC.md` wins on conflicts.
@@ -13,24 +13,24 @@
 5. Commit shape: single commit per sub-agent PR.
 
 ## Important API / Interface Changes (Kickoff Contract Freeze)
-1. Add missing websocket schema file at `/Users/josephstorey/OptionsAnalysis/websocket_schema.json` and make it authoritative for `snapshot|delta|heartbeat`.
-2. Normalize OpenAPI compatibility in [openapi.json](/Users/josephstorey/OptionsAnalysis/openapi.json):
+1. Add missing websocket schema file at `<repo-root>/websocket_schema.json` and make it authoritative for `snapshot|delta|heartbeat`.
+2. Normalize OpenAPI compatibility in [openapi.json](<repo-root>/openapi.json):
    Change `openapi` to `3.1.0` to support JSON Schema null-union typing already used.
 3. Resolve per-dollar greek naming drift:
-   Use explicit keys `gamma_per_dollar`, `vega_per_dollar`, `theta_per_dollar` in [types.ts](/Users/josephstorey/OptionsAnalysis/types.ts), websocket schema, and OpenAPI.
+   Use explicit keys `gamma_per_dollar`, `vega_per_dollar`, `theta_per_dollar` in [types.ts](<repo-root>/types.ts), websocket schema, and OpenAPI.
 4. Resolve env/config drift:
    Update spec/env references to paper/live port model and remove ambiguity around single `IBKR_PORT`.
-5. Remove spec-violating account-balance read path from connector startup behavior in [backend/app/ibkr/connector.py](/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/connector.py) for v1 privacy constraints.
-6. Remove non-config metadata key from [config.default.json](/Users/josephstorey/OptionsAnalysis/config.default.json):
+5. Remove spec-violating account-balance read path from connector startup behavior in [backend/app/ibkr/connector.py](<repo-root>/backend/app/ibkr/connector.py) for v1 privacy constraints.
+6. Remove non-config metadata key from [config.default.json](<repo-root>/config.default.json):
    Drop `"filename"` so file matches `Config` schema exactly.
 
 ## Sub-Agent Assignments (Performance-Optimized)
 
 | Agent | Branch | Commit Message | Draft PR Title | Owned Files | Required Deliverables | Performance KPI |
 |---|---|---|---|---|---|---|
-| Subagent A (Backend/Data) | `codex/subagent-a-kickoff-data-plane` | `kickoff data plane contracts and runtime scaffolds` | `[codex] Kickoff data plane contracts and runtime scaffolds` | [backend/app/ibkr/config.py](/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/config.py), [backend/app/ibkr/connector.py](/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/connector.py), `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`, [openapi.json](/Users/josephstorey/OptionsAnalysis/openapi.json), `/Users/josephstorey/OptionsAnalysis/websocket_schema.json`, [config.default.json](/Users/josephstorey/OptionsAnalysis/config.default.json), [BACKEND_FORMAT_HINTS.md](/Users/josephstorey/OptionsAnalysis/BACKEND_FORMAT_HINTS.md) | FastAPI skeleton (`/health`, `/state`, `/config`, `/stream`), startup task wiring, heartbeat contract, config overlay flow, contract/schema freeze | Backend refresh loop target defined and test-instrumented for `<50ms` compute budget |
-| Subagent B (Analytics) | `codex/subagent-b-kickoff-analytics` | `kickoff analytics engine contracts and deterministic vectors` | `[codex] Kickoff analytics engine contracts and deterministic vectors` | `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/iv_surface.py`, `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/exposures.py`, `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/msi_mtc.py`, `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/engine.py`, `/Users/josephstorey/OptionsAnalysis/backend/tests/test_analytics_*.py` | Pure-function interfaces for IV fit, exposures, MSI, MTC; deterministic fixtures; liquidity/delta hard-gate enforcement; rationale payload builder | Analytics functions stable under noise and deterministic replay; documented edge-case behavior |
-| Subagent C (Frontend/UI) | `codex/subagent-c-kickoff-ui-system` | `kickoff ui system with stable ladder and stream reducers` | `[codex] Kickoff ui system with stable ladder and stream reducers` | `/Users/josephstorey/OptionsAnalysis/frontend/*`, [types.ts](/Users/josephstorey/OptionsAnalysis/types.ts), [UI_FORMATTING.md](/Users/josephstorey/OptionsAnalysis/UI_FORMATTING.md), [FRONTEND_RENDER_CHECKLIST.md](/Users/josephstorey/OptionsAnalysis/FRONTEND_RENDER_CHECKLIST.md) | Vite React scaffold, websocket reducers for snapshot/delta/heartbeat, fixed-width ladder shell, deterministic formatter utilities, stale/muted/MSI/MTC rendering hooks | Stable 500ms cadence rendering with fixed columns and no row-jitter regressions |
+| Subagent A (Backend/Data) | `codex/subagent-a-kickoff-data-plane` | `kickoff data plane contracts and runtime scaffolds` | `[codex] Kickoff data plane contracts and runtime scaffolds` | [backend/app/ibkr/config.py](<repo-root>/backend/app/ibkr/config.py), [backend/app/ibkr/connector.py](<repo-root>/backend/app/ibkr/connector.py), `<repo-root>/backend/app/main.py`, [openapi.json](<repo-root>/openapi.json), `<repo-root>/websocket_schema.json`, [config.default.json](<repo-root>/config.default.json), [BACKEND_FORMAT_HINTS.md](<repo-root>/BACKEND_FORMAT_HINTS.md) | FastAPI skeleton (`/health`, `/state`, `/config`, `/stream`), startup task wiring, heartbeat contract, config overlay flow, contract/schema freeze | Backend refresh loop target defined and test-instrumented for `<50ms` compute budget |
+| Subagent B (Analytics) | `codex/subagent-b-kickoff-analytics` | `kickoff analytics engine contracts and deterministic vectors` | `[codex] Kickoff analytics engine contracts and deterministic vectors` | `<repo-root>/backend/app/analytics/iv_surface.py`, `<repo-root>/backend/app/analytics/exposures.py`, `<repo-root>/backend/app/analytics/msi_mtc.py`, `<repo-root>/backend/app/analytics/engine.py`, `<repo-root>/backend/tests/test_analytics_*.py` | Pure-function interfaces for IV fit, exposures, MSI, MTC; deterministic fixtures; liquidity/delta hard-gate enforcement; rationale payload builder | Analytics functions stable under noise and deterministic replay; documented edge-case behavior |
+| Subagent C (Frontend/UI) | `codex/subagent-c-kickoff-ui-system` | `kickoff ui system with stable ladder and stream reducers` | `[codex] Kickoff ui system with stable ladder and stream reducers` | `<repo-root>/frontend/*`, [types.ts](<repo-root>/types.ts), [UI_FORMATTING.md](<repo-root>/UI_FORMATTING.md), [FRONTEND_RENDER_CHECKLIST.md](<repo-root>/FRONTEND_RENDER_CHECKLIST.md) | Vite React scaffold, websocket reducers for snapshot/delta/heartbeat, fixed-width ladder shell, deterministic formatter utilities, stale/muted/MSI/MTC rendering hooks | Stable 500ms cadence rendering with fixed columns and no row-jitter regressions |
 
 ## Merge Order and Dependency Plan
 1. Subagent A merges first because it freezes API/schema contracts used by B and C.
@@ -58,8 +58,8 @@
 ## Test Cases and Scenarios
 
 ### Contract and Schema
-1. Validate websocket envelopes against `/Users/josephstorey/OptionsAnalysis/websocket_schema.json`.
-2. Validate REST payloads against [openapi.json](/Users/josephstorey/OptionsAnalysis/openapi.json).
+1. Validate websocket envelopes against `<repo-root>/websocket_schema.json`.
+2. Validate REST payloads against [openapi.json](<repo-root>/openapi.json).
 3. Confirm `types.ts` and websocket schema field parity via schema snapshot test.
 
 ### Backend/Data

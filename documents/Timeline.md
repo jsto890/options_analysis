@@ -1,7 +1,7 @@
 # Timeline
 
 _Last updated: 2026-02-26 (local)_
-_Project root: `/Users/josephstorey/OptionsAnalysis`_
+_Project root: `<repo-root>`_
 
 ## 1) Execution Timeline (Chronological)
 
@@ -15,9 +15,9 @@ _Project root: `/Users/josephstorey/OptionsAnalysis`_
 
 ### Phase 1: Subagent A data-plane scaffold
 - Implemented backend REST + websocket runtime shell:
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/state/store.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/window_manager.py`
+  - `<repo-root>/backend/app/main.py`
+  - `<repo-root>/backend/app/state/store.py`
+  - `<repo-root>/backend/app/ibkr/window_manager.py`
 - Added heartbeat loop, bounded per-client WS queue, snapshot/delta flow.
 - Added refresh compute budget guard (`p95 < 50ms`) and runtime tests.
 
@@ -26,10 +26,10 @@ Validation:
 
 ### Phase 2: Subagent B analytics contracts
 - Implemented analytics stack:
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/iv_surface.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/exposures.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/msi_mtc.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/analytics/engine.py`
+  - `<repo-root>/backend/app/analytics/iv_surface.py`
+  - `<repo-root>/backend/app/analytics/exposures.py`
+  - `<repo-root>/backend/app/analytics/msi_mtc.py`
+  - `<repo-root>/backend/app/analytics/engine.py`
 - Added persistence logic and deterministic MTC rationale contract.
 
 Validation:
@@ -63,7 +63,7 @@ Validation:
   - loop-binding patch for async IB calls
   - contract qualification helpers
   - option subscription cancellation helper
-- Completed live ingestion/runtime window machinery in `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`:
+- Completed live ingestion/runtime window machinery in `<repo-root>/backend/app/main.py`:
   - underlying + chain bootstrap
   - expiry selection and active-window subscription
   - ticker ingestion into row contract blocks
@@ -78,19 +78,19 @@ Validation:
 
 ### Phase 6: Frontend advanced surfaces completion
 - Added detail drawer + pinned selection workflow:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/PinnedDetailDrawer.tsx`
-  - row/contract selection wiring in `/Users/josephstorey/OptionsAnalysis/frontend/src/components/StrikeLadder.tsx`
-  - selection + keyboard navigation in `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
+  - `<repo-root>/frontend/src/components/PinnedDetailDrawer.tsx`
+  - row/contract selection wiring in `<repo-root>/frontend/src/components/StrikeLadder.tsx`
+  - selection + keyboard navigation in `<repo-root>/frontend/src/App.tsx`
 - Added compact right-panel charts:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/MiniIvChart.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/MiniExposureChart.tsx`
+  - `<repo-root>/frontend/src/components/MiniIvChart.tsx`
+  - `<repo-root>/frontend/src/components/MiniExposureChart.tsx`
 - Added deterministic contract copy descriptor utility:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/contracts.ts`
+  - `<repo-root>/frontend/src/utils/contracts.ts`
 - Added rolling contract timeseries cache:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/utils/timeseries.ts`
+  - `<repo-root>/frontend/src/utils/timeseries.ts`
 - Added live playback parity fixture and tests:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/fixtures/live_session.sample.json`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/live_playback_parity.test.ts`
+  - `<repo-root>/frontend/src/ws/fixtures/live_session.sample.json`
+  - `<repo-root>/frontend/src/ws/live_playback_parity.test.ts`
 
 Validation:
 - `npm --prefix frontend test -- --run` -> `6 files passed, 14 tests`
@@ -129,15 +129,15 @@ In progress:
 - Restore `gh` shell authentication before any PR automation workflow.
 
 ## 4) References for Next Context
-- Spec source of truth: `/Users/josephstorey/OptionsAnalysis/SPEC.md`
-- Kickoff contract: `/Users/josephstorey/OptionsAnalysis/Kickoff_Plan.md`
-- PM status matrix: `/Users/josephstorey/OptionsAnalysis/PM_STATUS_MATRIX.md`
+- Spec source of truth: `<repo-root>/SPEC.md`
+- Kickoff contract: `<repo-root>/Kickoff_Plan.md`
+- PM status matrix: `<repo-root>/PM_STATUS_MATRIX.md`
 - High-signal backend files:
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/main.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/state/store.py`
-  - `/Users/josephstorey/OptionsAnalysis/backend/app/ibkr/connector.py`
+  - `<repo-root>/backend/app/main.py`
+  - `<repo-root>/backend/app/state/store.py`
+  - `<repo-root>/backend/app/ibkr/connector.py`
 - High-signal frontend files:
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/App.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/StrikeLadder.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/components/PinnedDetailDrawer.tsx`
-  - `/Users/josephstorey/OptionsAnalysis/frontend/src/ws/live_playback_parity.test.ts`
+  - `<repo-root>/frontend/src/App.tsx`
+  - `<repo-root>/frontend/src/components/StrikeLadder.tsx`
+  - `<repo-root>/frontend/src/components/PinnedDetailDrawer.tsx`
+  - `<repo-root>/frontend/src/ws/live_playback_parity.test.ts`
