@@ -10,7 +10,7 @@ from pathlib import Path
 from time import time
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,12 +33,15 @@ from app.schemas import (
     MtcRationale,
     StateSnapshot,
     StrikeRow,
+    SymbolUpdate,
     UnderlyingSpot,
     build_default_snapshot,
 )
 from app.state.store import RuntimeStore
 
 logger = logging.getLogger(__name__)
+
+SWITCHABLE_SYMBOLS = ["SPY", "QQQ", "IWM", "DIA"]
 
 
 @dataclass(frozen=True)
@@ -88,6 +91,7 @@ class MarketDataRuntime:
     force_snapshot_broadcast: bool = False
     last_roll_ts: float = 0.0
     bootstrap_inflight: bool = False
+    switch_inflight: bool = False
 
 
 def now_ms() -> int:
@@ -263,6 +267,17 @@ def create_app(
 
         app.state.market_data.force_snapshot_broadcast = True
         return updated
+
+    @app.post("/control/symbol")
+    async def control_symbol(update: SymbolUpdate):
+        symbol = update.symbol.upper()
+        if symbol not in SWITCHABLE_SYMBOLS:
+            raise HTTPException(status_code=400, detail=f"symbol must be one of {SWITCHABLE_SYMBOLS}")
+        market: MarketDataRuntime = app.state.market_data
+        if symbol == market.symbol or market.switch_inflight:
+            return {"symbol": market.symbol}
+        await _switch_symbol(app, symbol)
+        return {"symbol": market.symbol}
 
     @app.websocket("/stream")
     async def stream(ws: WebSocket) -> None:
@@ -571,6 +586,38 @@ async def _bootstrap_market_data(app: FastAPI) -> None:
         )
     finally:
         market.bootstrap_inflight = False
+
+
+async def _switch_symbol(app: FastAPI, symbol: str) -> None:
+    market: MarketDataRuntime = app.state.market_data
+    market.switch_inflight = True
+    try:
+        await _set_active_window(app, [], reason="switch")
+        if market.underlying_ticker is not None:
+            contract = getattr(market.underlying_ticker, "contract", None)
+            if contract is not None:
+                app.state.connector.cancel_market_data(contract)
+            market.underlying_ticker = None
+
+        market.symbol = symbol
+        market.expiry = ""
+        market.market_ready = False
+        market.option_contracts_by_strike = {}
+        market.all_strikes = []
+        market.active_window_strikes = []
+        market.contract_by_id = {}
+        market.ticker_by_id = {}
+        app.state.residual_history = {}
+
+        snapshot = app.state.store.snapshot
+        snapshot.underlying.symbol = symbol
+        snapshot.underlying.expiry = ""
+        snapshot.rows = []
+        app.state.store.update_underlying_spot(UnderlyingSpot())
+        market.force_snapshot_broadcast = True
+        logger.info("Switched active symbol to %s", symbol)
+    finally:
+        market.switch_inflight = False
 
 
 async def _ingest_market_data(app: FastAPI) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -21,6 +22,7 @@ class DummyConnector:
     def __init__(self, connected: bool = True, subscriptions: int = 0):
         self._connected = connected
         self.ib = DummyIB(subscriptions=subscriptions)
+        self.cancelled: list = []
 
     async def connect(self, paper: bool = True) -> bool:
         self._connected = True
@@ -31,6 +33,9 @@ class DummyConnector:
 
     def is_connected(self) -> bool:
         return self._connected
+
+    def cancel_market_data(self, contract) -> None:
+        self.cancelled.append(contract)
 
 
 def _make_app(tmp_path, subscriptions: int = 0, seed_rows: bool = False):
@@ -220,3 +225,72 @@ def test_health_reports_current_symbol(tmp_path):
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json()["symbol"] == "QQQ"
+
+
+def _seed_market(app):
+    market = app.state.market_data
+    call = SimpleNamespace(
+        conId=1, symbol="QQQ", lastTradeDateOrContractMonth="20260630", right="C", strike=430.0
+    )
+    put = SimpleNamespace(
+        conId=2, symbol="QQQ", lastTradeDateOrContractMonth="20260630", right="P", strike=430.0
+    )
+    market.underlying_ticker = SimpleNamespace(contract=SimpleNamespace(conId=3, symbol="QQQ"))
+    market.expiry = "20260630"
+    market.market_ready = True
+    market.option_contracts_by_strike = {430.0: {"C": call, "P": put}}
+    market.all_strikes = [430.0]
+    market.active_window_strikes = [430.0]
+
+
+def test_control_symbol_rejects_unknown_symbol(tmp_path):
+    app = _make_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post("/control/symbol", json={"symbol": "TSLA"})
+        assert response.status_code == 400
+        assert app.state.market_data.symbol == "QQQ"
+        assert app.state.store.snapshot.underlying.symbol == "QQQ"
+        assert app.state.connector.cancelled == []
+
+
+def test_control_symbol_switch_resets_runtime_and_snapshot(tmp_path):
+    app = _make_app(tmp_path, seed_rows=True)
+    with TestClient(app) as client:
+        _seed_market(app)
+        response = client.post("/control/symbol", json={"symbol": "SPY"})
+        assert response.status_code == 200
+        assert response.json() == {"symbol": "SPY"}
+
+        market = app.state.market_data
+        assert market.symbol == "SPY"
+        assert market.market_ready is False
+        assert market.underlying_ticker is None
+        assert market.expiry == ""
+        assert market.option_contracts_by_strike == {}
+        assert market.all_strikes == []
+        assert market.active_window_strikes == []
+        assert market.contract_by_id == {}
+        assert market.ticker_by_id == {}
+
+        snapshot = app.state.store.snapshot
+        assert snapshot.underlying.symbol == "SPY"
+        assert snapshot.underlying.expiry == ""
+        assert snapshot.rows == []
+        assert snapshot.underlying.spot.mid is None
+
+        # call + put option cancels from window teardown, plus the underlying
+        assert len(app.state.connector.cancelled) == 3
+
+        assert client.get("/health").json()["symbol"] == "SPY"
+
+
+def test_control_symbol_same_symbol_is_noop(tmp_path):
+    app = _make_app(tmp_path)
+    with TestClient(app) as client:
+        _seed_market(app)
+        response = client.post("/control/symbol", json={"symbol": "QQQ"})
+        assert response.status_code == 200
+        assert response.json() == {"symbol": "QQQ"}
+        assert app.state.market_data.market_ready is True
+        assert app.state.market_data.underlying_ticker is not None
+        assert app.state.connector.cancelled == []

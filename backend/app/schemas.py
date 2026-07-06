@@ -149,6 +149,10 @@ class ConfigUpdate(BaseModel):
     max_subscriptions_soft_limit: int | None = None
 
 
+class SymbolUpdate(BaseModel):
+    symbol: str
+
+
 class DesktopSettings(BaseModel):
     connect_paper: bool = False
     client_id: int = Field(default=19, ge=0)
