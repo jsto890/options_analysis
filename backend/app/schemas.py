@@ -188,6 +188,7 @@ class HealthResponse(BaseModel):
     server_ts_ms: int
     ibkr_connected: bool
     subscriptions: int
+    symbol: str = "QQQ"
 
 
 class EnvelopeBase(BaseModel):

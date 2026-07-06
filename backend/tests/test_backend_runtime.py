@@ -212,3 +212,11 @@ def test_refresh_loop_populates_msi_and_mtc_fields(tmp_path):
             assert row["flags"]["is_msi"] is True
             assert row["call"]["mtc_score"] is not None
             assert row["put"]["mtc_score"] is not None
+
+
+def test_health_reports_current_symbol(tmp_path):
+    app = _make_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json()["symbol"] == "QQQ"

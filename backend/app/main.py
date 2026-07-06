@@ -239,6 +239,7 @@ def create_app(
             server_ts_ms=now_ms(),
             ibkr_connected=app.state.connector.is_connected() if app.state.connector else False,
             subscriptions=_subscription_count(app),
+            symbol=app.state.market_data.symbol,
         )
 
     @app.get("/state", response_model=StateSnapshot)
