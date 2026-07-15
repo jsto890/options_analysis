@@ -6,13 +6,14 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from ib_insync import IB, Option, Stock, Ticker, util as ib_util
+from ib_insync import IB, Option, Ticker, util as ib_util
 from ib_insync import client as ib_client
 from ib_insync import connection as ib_connection
 from ib_insync.contract import Contract
 from ib_insync.objects import BarDataList
 
 from app.ibkr.config import IBKRConfig
+from app.ibkr.symbols import build_underlying, is_index, option_trading_class
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,10 @@ class IBKRConnector:
             logger.error("Failed option chain request: %s", exc)
             return []
 
+        trading_class = option_trading_class(symbol) if is_index(symbol) else None
+        if trading_class is not None:
+            chains = [chain for chain in chains if chain.tradingClass == trading_class]
+
         today = datetime.now().date()
         by_expiry: dict[str, set[float]] = {}
         for chain in chains:
@@ -255,18 +260,19 @@ class IBKRConnector:
                         continue
                     strike_set.add(strike_float)
 
+        option_kwargs = {"tradingClass": trading_class} if trading_class else {}
         options: list[Contract] = []
         for expiry in sorted(by_expiry):
             for strike in sorted(by_expiry[expiry]):
-                options.append(Option(contract.symbol, expiry, strike, "C", "SMART"))
-                options.append(Option(contract.symbol, expiry, strike, "P", "SMART"))
+                options.append(Option(contract.symbol, expiry, strike, "C", "SMART", **option_kwargs))
+                options.append(Option(contract.symbol, expiry, strike, "P", "SMART", **option_kwargs))
         return options
 
     async def qualify_underlying(self, symbol: str = "QQQ") -> Optional[Contract]:
         if not self.is_connected():
             return None
         try:
-            underlying = Stock(symbol, "SMART", "USD")
+            underlying = build_underlying(symbol)
             with self._bound_ib_loop():
                 qualified = await self.ib.qualifyContractsAsync(underlying)
             for contract in qualified:
@@ -293,7 +299,7 @@ class IBKRConnector:
         if not self.is_connected():
             return None
         try:
-            return await self._request_market_data(Stock(symbol, "SMART", "USD"), snapshot=False)
+            return await self._request_market_data(build_underlying(symbol), snapshot=False)
         except Exception as exc:
             logger.error("Failed underlying stream subscription: %s", exc)
             return None
