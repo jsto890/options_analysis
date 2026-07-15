@@ -3,11 +3,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def infer_strike_step(strikes: list[float]) -> float:
+    """Infer the chain's strike increment from actual listed strikes.
+
+    Takes the median of consecutive differences across sorted unique
+    strikes. Fewer than two distinct strikes gives no usable spacing, so
+    this falls back to 1.0 (the ETF-style default).
+    """
+    unique_sorted = sorted(set(strikes))
+    if len(unique_sorted) < 2:
+        return 1.0
+    diffs = sorted(b - a for a, b in zip(unique_sorted, unique_sorted[1:]))
+    return diffs[len(diffs) // 2]
+
+
 @dataclass(frozen=True)
 class WindowPlan:
     target_strikes: list[float]
     add_strikes: list[float]
     remove_strikes: list[float]
+    strike_step: float = 1.0
 
 
 class StrikeWindowManager:
@@ -60,4 +75,5 @@ class StrikeWindowManager:
             target_strikes=target,
             add_strikes=add_strikes,
             remove_strikes=remove_strikes,
+            strike_step=infer_strike_step(all_strikes),
         )
