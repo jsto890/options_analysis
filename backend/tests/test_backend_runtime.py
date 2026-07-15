@@ -294,3 +294,19 @@ def test_control_symbol_same_symbol_is_noop(tmp_path):
         assert app.state.market_data.market_ready is True
         assert app.state.market_data.underlying_ticker is not None
         assert app.state.connector.cancelled == []
+
+
+def test_switchable_symbols_covers_etfs_then_indexes():
+    from app.main import SWITCHABLE_SYMBOLS
+    assert SWITCHABLE_SYMBOLS == [
+        "SPY", "QQQ", "IWM", "DIA", "SPX", "NDX", "RUT", "DJX",
+    ]
+
+
+def test_control_symbol_switches_to_index(tmp_path):
+    app = _make_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post("/control/symbol", json={"symbol": "SPX"})
+        assert response.status_code == 200
+        assert response.json() == {"symbol": "SPX"}
+        assert client.get("/health").json()["symbol"] == "SPX"

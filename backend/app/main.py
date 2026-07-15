@@ -41,7 +41,7 @@ from app.state.store import RuntimeStore
 
 logger = logging.getLogger(__name__)
 
-SWITCHABLE_SYMBOLS = ["SPY", "QQQ", "IWM", "DIA"]
+SWITCHABLE_SYMBOLS = ["SPY", "QQQ", "IWM", "DIA", "SPX", "NDX", "RUT", "DJX"]
 
 
 @dataclass(frozen=True)
